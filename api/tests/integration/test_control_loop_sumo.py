@@ -92,11 +92,14 @@ def test_turning_routes_run_under_single_approach_signal_control():
     controlled = [c for c in root.findall("connection") if c.get("tl") == config.simulation.tls_id]
     assert len(controlled) == 12
     phases = root.find("tlLogic").findall("phase")
-    for phase, direction in zip(phases[::2][:4], ("north", "south", "east", "west"), strict=True):
-        state = phase.attrib["state"]
+    for index, direction in enumerate(("north", "south", "east", "west")):
+        green = phases[index * 2].attrib["state"]
+        yellow = phases[index * 2 + 1].attrib["state"]
         for connection in controlled:
-            active = state[int(connection.attrib["linkIndex"])] == "G"
-            assert active == (connection.attrib["from"] == f"{direction}_in")
+            link_index = int(connection.attrib["linkIndex"])
+            is_approach = connection.attrib["from"] == f"{direction}_in"
+            assert green[link_index] == ("G" if is_approach else "r")
+            assert yellow[link_index] == ("y" if is_approach else "r")
     assert set(phases[-1].attrib["state"]) == {"r"}
 
     client = TraciClient(config.simulation.sumocfg_path, seed=123, label="integration-turning")

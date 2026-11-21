@@ -108,14 +108,11 @@ function signalTickGeometryFor(laneWidth: number) {
 }
 
 /**
- * A lane-direction arrow's size: the shaft+head painted on each lane
- * just before its signal tick, showing which way that lane
- * travels (this network has no per-lane turn restrictions, so every lane
- * gets a straight-ahead arrow).
+ * Size of the permitted-movement arrows painted before each signal.
  */
 function laneArrowGeometryFor(laneWidth: number) {
   return {
-    length: laneWidth * 0.19,
+    length: laneWidth * 0.28,
     width: laneWidth * 0.14,
     gap: laneWidth * 0.25,
   };
@@ -559,9 +556,7 @@ export function JunctionPixiCanvas({
         }
       }
 
-      // One straight-ahead direction arrow per lane, right after that
-      // lane's signal tick; this network has no per-lane turn
-      // restrictions, so every lane gets the same forward arrow.
+      // All three movements share this inbound lane; no U-turn is shown.
       for (let lane = 0; lane < LANES_PER_DIRECTION; lane++) {
         const laneOffset = (lane + 0.5) * laneWidth;
         const arrowCenterMap: [number, number] = [
@@ -572,19 +567,26 @@ export function JunctionPixiCanvas({
             outwardVec[1] * arrowCenterDistance +
             perpVec[1] * laneOffset,
         ];
-        const { shaft, head } = laneArrowPolygons(
-          arrowCenterMap,
+        const movements: [number, number][] = [
           dirVec,
           perpVec,
-          arrow.length,
-          arrow.width,
-        );
-        scene
-          .poly(shaft.map(([x, y]) => toSceneSpace(bounds, [x, y])).flat())
-          .fill({ color: ROAD_PAINT, alpha: 0.85 });
-        scene
-          .poly(head.map(([x, y]) => toSceneSpace(bounds, [x, y])).flat())
-          .fill({ color: ROAD_PAINT, alpha: 0.85 });
+          [-perpVec[0], -perpVec[1]],
+        ];
+        for (const movement of movements) {
+          const { shaft, head } = laneArrowPolygons(
+            arrowCenterMap,
+            movement,
+            mapPerp(movement),
+            arrow.length,
+            arrow.width,
+          );
+          scene
+            .poly(shaft.map(([x, y]) => toSceneSpace(bounds, [x, y])).flat())
+            .fill({ color: ROAD_PAINT, alpha: 0.85 });
+          scene
+            .poly(head.map(([x, y]) => toSceneSpace(bounds, [x, y])).flat())
+            .fill({ color: ROAD_PAINT, alpha: 0.85 });
+        }
       }
     }
 
