@@ -351,7 +351,7 @@ describe("displayVehiclePosition", () => {
 describe("junction movement scale", () => {
   it("keeps displayed speed changes moderate at each stop line", () => {
     const geometry = makeNetworkGeometry();
-    const laneWidth = 13.5;
+    const laneWidth = 9;
     const stopDistance = laneWidth * (0.7 + 0.15 + 0.32);
     for (const direction of DIRECTIONS) {
       const lane = geometry.lanes.find(

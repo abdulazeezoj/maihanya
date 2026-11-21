@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import {
   congestionColor,
   congestionLevel,
-  crosswalkAnchors,
   DIRECTION_LABEL,
   DIRECTIONS,
   directionLabelAnchors,
@@ -71,24 +70,11 @@ const FRAME_MARGIN = 0.9;
 
 // Match the single inbound and outbound lane in the SUMO network. A modest
 // visual widening keeps the road legible without excessively stretching the junction.
-const LANE_WIDTH_RATIO = 0.045;
+const LANE_WIDTH_RATIO = 0.03;
 const LANES_PER_DIRECTION = 1;
 
-// How far the cosmetic pavement plaza reaches past each arm's shared
-// corner notch, as a multiple of one direction's lane block width. Kept
-// deliberately small (rather than the ~1.5x a literal SUMO junction mouth
-// would suggest) because every other near-junction feature (signal
-// ticks, lane arrows, the crosswalk) is anchored past this reach and
-// stacks on top of it; a wide plaza just for its own sake eats into the
-// only real budget available for open, "car is actually driving here"
-// road, since the network's real per-arm length is fixed by the
-// calibrated SUMO net and can't grow to compensate.
+// Keep the junction compact so the displayed speed remains close to SUMO's.
 const ARM_REACH_RATIO = 0.7;
-
-// Gap between the lane arrows and the crosswalk, as a multiple of one
-// lane's own width; see ARM_REACH_RATIO for why this is kept tight
-// rather than generous.
-const CROSSWALK_GAP_RATIO = 0.3;
 
 function laneWidthFor(bounds: NetworkGeometry["bounds"]): number {
   return (
@@ -108,8 +94,8 @@ function roadWidthFor(bounds: NetworkGeometry["bounds"]): number {
  * is): the real network's inbound lanes connect only a few units from the
  * junction center, but the widened single-lane carriageway this canvas
  * draws is anchored on `armReach` out from the center instead, so
- * anything meant to sit "just past the plaza" (signal ticks, the
- * crosswalk) has to measure from the center + `armReach`, not from the
+ * anything meant to sit "just past the plaza" (signal ticks and arrows)
+ * has to measure from the center + `armReach`, not from the
  * real, close-in stop line.
  */
 function pavementGeometryFor(bounds: NetworkGeometry["bounds"]) {
@@ -123,9 +109,8 @@ function pavementGeometryFor(bounds: NetworkGeometry["bounds"]) {
 
 /**
  * The per-lane signal tick's own size, shared between `drawSignals` (which
- * draws the ticks) and `drawStatic` (which draws the lane arrows and
- * crosswalk right after them) so those line up exactly where the ticks
- * end. Each tick is laid crosswise over its own single lane: `span` is
+ * draws the ticks) and `drawStatic` (which draws the lane arrows)
+ * so the two line up. Each tick is laid crosswise over its own single lane: `span` is
  * how far it reaches across the lane (perpendicular to travel) and
  * `thickness` is how deep it is along the lane (parallel to travel, kept
  * small so it reads as a stop-line mark, not a speed bump).
@@ -140,7 +125,7 @@ function signalTickGeometryFor(laneWidth: number) {
 
 /**
  * A lane-direction arrow's size: the shaft+head painted on each lane
- * between its signal tick and the crosswalk, showing which way that lane
+ * just before its signal tick, showing which way that lane
  * travels (this network has no per-lane turn restrictions, so every lane
  * gets a straight-ahead arrow).
  */
@@ -482,23 +467,11 @@ export function JunctionPixiCanvas({
     const laneWidth = laneWidthFor(bounds);
     const center = junctionCenter(geo);
 
-    // Reading outward from the junction center: the pavement plaza (out to
-    // `armReach`), then each lane's signal tick (drawn in `drawSignals`),
-    // then a straight-ahead direction arrow on each lane, then the zebra
-    // crossing, then the regular dashed lane markings and approaching
-    // traffic: the same stop-line layout real SUMO-GUI renders. All of it
-    // anchored `armReach` + gaps out from the junction *center*, not the
-    // real (much closer-in) SUMO stop line; see `pavementGeometryFor`.
+    // Signals and direction arrows share the same distance from the center.
     const tick = signalTickGeometryFor(laneWidth);
     const arrow = laneArrowGeometryFor(laneWidth);
     const tickOuterEdge = armReach + tick.gap + tick.thickness;
     const arrowCenterDistance = tickOuterEdge + arrow.gap + arrow.length / 2;
-    const arrowOuterEdge = arrowCenterDistance + arrow.length / 2;
-    const crossGap = laneWidth * CROSSWALK_GAP_RATIO;
-    const crosswalkDepth = laneWidth * 1.2;
-    const crosswalkDistance = arrowOuterEdge + crossGap + crosswalkDepth / 2;
-    const crosswalkNearDistance = crosswalkDistance - crosswalkDepth / 2;
-    const crosswalkFarDistance = crosswalkDistance + crosswalkDepth / 2;
 
     for (const direction of DIRECTIONS) {
       // Both directions of travel share one drawn carriageway, built from
@@ -509,7 +482,24 @@ export function JunctionPixiCanvas({
         (lane) => lane.direction === direction && lane.kind === "in",
       );
       if (!inLane) continue;
-      const scenePoints = inLane.shape.map((pt) => toSceneSpace(bounds, pt));
+      // Center the two-way ribbon on the junction, not on the inbound
+      // SUMO lane (which is offset to one side of the road centerline).
+      const outer = inLane.shape[0];
+      const inner = inLane.shape[inLane.shape.length - 1];
+      const directionLength =
+        Math.hypot(inner[0] - outer[0], inner[1] - outer[1]) || 1;
+      const normal: [number, number] = [
+        (inner[1] - outer[1]) / directionLength,
+        -(inner[0] - outer[0]) / directionLength,
+      ];
+      const laneOffset =
+        (inner[0] - center.x) * normal[0] + (inner[1] - center.y) * normal[1];
+      const scenePoints = inLane.shape.map((pt) =>
+        toSceneSpace(bounds, [
+          pt[0] - normal[0] * laneOffset,
+          pt[1] - normal[1] * laneOffset,
+        ]),
+      );
       const ribbon = offsetRibbon(scenePoints, roadWidth * 2);
       if (ribbon.length > 0) {
         scene.poly(ribbon.flat()).fill(ASPHALT);
@@ -524,9 +514,7 @@ export function JunctionPixiCanvas({
       // Travel direction (into the junction) and its outward reverse, plus
       // how far the real lane's own outer endpoint sits from the junction
       // center: everything below is parameterized as `center + outward *
-      // distance` so the lane arrows/crosswalk/tick geometry all line up
-      // exactly, and so the lane dividers can be skipped across the
-      // crosswalk's own span instead of running straight through it.
+      // distance` so the lane arrows and signal geometry line up exactly.
       const outerMap = inLane.shape[0];
       const innerMap = inLane.shape[inLane.shape.length - 1];
       const tx = innerMap[0] - outerMap[0];
@@ -546,16 +534,8 @@ export function JunctionPixiCanvas({
           center.y + outwardVec[1] * distance,
         ]);
 
-      // Lane dividers only across the two stretches of road that aren't
-      // the crosswalk: from the plaza edge out to just before the
-      // crossing, then from just past it out to where the real lane data
-      // ends. Drawing them the full length (as the crosswalk stripes were
-      // then painted over) left the dashes and centerline showing through
-      // the gaps *between* the zebra stripes.
-      const dividerSpans: [number, number][] = [
-        [armReach, crosswalkNearDistance],
-        [crosswalkFarDistance, outerDist],
-      ];
+      // The centerline runs continuously up each arm to the junction mouth.
+      const dividerSpans: [number, number][] = [[roadWidth, outerDist]];
       for (const [nearD, farD] of dividerSpans) {
         if (farD <= nearD) continue;
         const [x1, y1] = pointAt(nearD);
@@ -642,34 +622,6 @@ export function JunctionPixiCanvas({
       }
     }
 
-    // Zebra pedestrian crossings, one per approach. A real crosswalk's
-    // stripes each run ALONG the direction of travel (the way pedestrians
-    // walking across the road cut perpendicular to them) and are repeated
-    // side by side ACROSS the road's width, not the other way around.
-    const crosswalks = crosswalkAnchors(geo, crosswalkDistance);
-    const crosswalkSpan = roadWidth * 2 * 0.94;
-    const stripeCount = 9;
-    const stripeWidth = crosswalkSpan / (2 * stripeCount - 1);
-    for (const direction of DIRECTIONS) {
-      const anchor = crosswalks[direction];
-      if (!anchor) continue;
-      for (let i = 0; i < stripeCount; i++) {
-        const delta = (i - (stripeCount - 1) / 2) * stripeWidth * 2;
-        const centerMap: [number, number] = [
-          anchor.center[0] + anchor.perpendicular[0] * delta,
-          anchor.center[1] + anchor.perpendicular[1] * delta,
-        ];
-        const corners = orientedRectCorners(
-          centerMap,
-          anchor.direction,
-          anchor.perpendicular,
-          crosswalkDepth,
-          stripeWidth,
-        ).map(([x, y]) => toSceneSpace(bounds, [x, y]));
-        scene.poly(corners.flat()).fill({ color: ROAD_PAINT, alpha: 0.85 });
-      }
-    }
-
     // Direction captions ("North"/"South"/...) set back along each arm and
     // offset into the grass beside the road, so a viewer can read
     // orientation without the text sitting on top of the lane markings.
@@ -731,14 +683,11 @@ export function JunctionPixiCanvas({
     // lane, not a single bar spanning the whole direction's lane block,
     // and not running lengthwise with the lane either: a real stop-line
     // signal mark reads as a small gate across the lane it controls, the
-    // same way the lane divider and crosswalk stripes it sits between are
-    // both lengthwise with the road, and the light has to contrast with
-    // both. Positioned `armReach` + a small gap out from the junction
+    // with enough contrast against the road and its centerline. Positioned `armReach` + a small gap out from the junction
     // *center*: the edge of the cosmetic pavement plaza, not the real
     // (much closer-in) SUMO stop line `pos.stop`, so the ticks sit just
     // past the plaza instead of buried inside it. Kept in sync with the
-    // lane-arrow and crosswalk geometry in `drawStatic`, which both start
-    // right where these ticks end.
+    // lane-arrow geometry in `drawStatic`, which starts just past the tick.
     const tick = signalTickGeometryFor(laneWidth);
     const tickCenterDistance = armReach + tick.gap + tick.thickness / 2;
 
@@ -771,7 +720,7 @@ export function JunctionPixiCanvas({
         ];
         // `span` (across the lane) runs along `perp`, `thickness` (along
         // the lane) runs along `pos.direction`: the reverse pairing of
-        // the lane arrows and crosswalk stripes just past this tick.
+        // the lane arrows just past this tick.
         const corners = orientedRectCorners(
           centerMap,
           perp,
@@ -794,19 +743,16 @@ export function JunctionPixiCanvas({
     const laneWidth = laneWidthFor(bounds);
     const center = junctionCenter(geo);
 
-    // Mirror drawStatic's tick → arrow → crosswalk distance chain so the
-    // tint's near edge lines up exactly with where the crosswalk ends;
-    // the tint represents queued traffic on the open road, and must never
-    // wash over the plaza, signal ticks, lane arrows, or crosswalk
-    // stripes those fixed markings need to stay crisp and legible.
+    // Keep the congestion tint behind the signal and direction arrow.
     const tick = signalTickGeometryFor(laneWidth);
     const arrow = laneArrowGeometryFor(laneWidth);
-    const tickOuterEdge = armReach + tick.gap + tick.thickness;
-    const arrowCenterDistance = tickOuterEdge + arrow.gap + arrow.length / 2;
-    const arrowOuterEdge = arrowCenterDistance + arrow.length / 2;
-    const crossGap = laneWidth * CROSSWALK_GAP_RATIO;
-    const crosswalkDepth = laneWidth * 1.2;
-    const crosswalkFarDistance = arrowOuterEdge + crossGap + crosswalkDepth;
+    const tintStartDistance =
+      armReach +
+      tick.gap +
+      tick.thickness +
+      arrow.gap +
+      arrow.length +
+      laneWidth * 0.3;
 
     layer.clear();
     const traffic = trafficStateRef.current;
@@ -834,7 +780,7 @@ export function JunctionPixiCanvas({
         outerMap[0] - center.x,
         outerMap[1] - center.y,
       );
-      if (outerDist <= crosswalkFarDistance) continue;
+      if (outerDist <= tintStartDistance) continue;
 
       // A short centerline offset `roadWidth / 2` along `perpVec`: the
       // same lateral convention drawStatic's lane arrows use for the
@@ -845,10 +791,10 @@ export function JunctionPixiCanvas({
       const laneCenterDistance = roadWidth / 2;
       const nearPoint: [number, number] = [
         center.x +
-          outwardVec[0] * crosswalkFarDistance +
+          outwardVec[0] * tintStartDistance +
           perpVec[0] * laneCenterDistance,
         center.y +
-          outwardVec[1] * crosswalkFarDistance +
+          outwardVec[1] * tintStartDistance +
           perpVec[1] * laneCenterDistance,
       ];
       const farPoint: [number, number] = [
