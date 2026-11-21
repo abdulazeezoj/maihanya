@@ -230,7 +230,10 @@ function vehicleLengthScale(
   return Math.min(...scales);
 }
 
-/** Map the front bumper while keeping the displayed vehicle length constant. */
+/** Map the front bumper while keeping the displayed vehicle length constant.
+ * A small visual allowance helps short vehicles remain visible. Its size is
+ * below the scenarios' default SUMO minimum gap (2.5 m).
+ */
 export function vehicleDisplayPose(
   geometry: NetworkGeometry,
   vehicle: {
@@ -268,7 +271,7 @@ export function vehicleDisplayPose(
   );
   const rotation = Math.atan2(front[0] - rear[0], rear[1] - front[1]);
   const displayLength =
-    length * vehicleLengthScale(geometry, laneWidth, stopDistance);
+    (length + 0.75) * vehicleLengthScale(geometry, laneWidth, stopDistance);
   return {
     x: front[0] - (Math.sin(rotation) * displayLength) / 2,
     y: front[1] + (Math.cos(rotation) * displayLength) / 2,

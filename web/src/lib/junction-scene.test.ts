@@ -348,6 +348,43 @@ describe("displayVehiclePosition", () => {
   });
 });
 
+describe("junction movement scale", () => {
+  it("keeps displayed speed changes moderate at each stop line", () => {
+    const geometry = makeNetworkGeometry();
+    const laneWidth = 13.5;
+    const stopDistance = laneWidth * (0.7 + 0.15 + 0.32);
+    for (const direction of DIRECTIONS) {
+      const lane = geometry.lanes.find(
+        (item) => item.kind === "in" && item.direction === direction,
+      );
+      if (!lane) throw new Error("missing lane");
+      const outer = lane.shape[0];
+      const stop = lane.shape[lane.shape.length - 1];
+      const dx = stop[0] - outer[0];
+      const dy = stop[1] - outer[1];
+      const length = Math.hypot(dx, dy);
+      const point = (distance: number): [number, number] => [
+        stop[0] + (dx / length) * distance,
+        stop[1] + (dy / length) * distance,
+      ];
+      const mapped = (distance: number) =>
+        displayVehiclePosition(
+          geometry,
+          point(distance),
+          laneWidth,
+          stopDistance,
+        );
+      const before = mapped(-3);
+      const at = mapped(0);
+      const after = mapped(3);
+      const inbound = Math.hypot(before[0] - at[0], before[1] - at[1]);
+      const junction = Math.hypot(after[0] - at[0], after[1] - at[1]);
+      expect(junction / inbound).toBeLessThan(2);
+      expect(junction / inbound).toBeGreaterThan(0.5);
+    }
+  });
+});
+
 describe("vehicleDisplayPose", () => {
   it("preserves bumper spacing for mixed vehicles queued behind a red light", () => {
     const geometry = makeNetworkGeometry();

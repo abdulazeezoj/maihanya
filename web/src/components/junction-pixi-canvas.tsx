@@ -69,14 +69,10 @@ const PHASE_PROGRESS_REFERENCE_SEC = 30;
 // never runs flush to the frame edge; leaves a grass margin on every side.
 const FRAME_MARGIN = 0.9;
 
-// The calibrated Sapon network models exactly one lane each way per
-// approach; that's the real, simulated geometry, and vehicle positions
-// always come from that single lane. LANES_PER_DIRECTION is a purely
-// cosmetic widening of the drawn carriageway into a multi-lane road (the
-// look of the reference SUMO-GUI capture this was redesigned to match),
-// not a claim that the simulation itself models extra lanes.
-const LANE_WIDTH_RATIO = 0.055;
-const LANES_PER_DIRECTION = 3;
+// Match the single inbound and outbound lane in the SUMO network. A modest
+// visual widening keeps the road legible without excessively stretching the junction.
+const LANE_WIDTH_RATIO = 0.045;
+const LANES_PER_DIRECTION = 1;
 
 // How far the cosmetic pavement plaza reaches past each arm's shared
 // corner notch, as a multiple of one direction's lane block width. Kept
@@ -87,7 +83,7 @@ const LANES_PER_DIRECTION = 3;
 // only real budget available for open, "car is actually driving here"
 // road, since the network's real per-arm length is fixed by the
 // calibrated SUMO net and can't grow to compensate.
-const ARM_REACH_RATIO = 0.85;
+const ARM_REACH_RATIO = 0.7;
 
 // Gap between the lane arrows and the crosswalk, as a multiple of one
 // lane's own width; see ARM_REACH_RATIO for why this is kept tight
@@ -110,7 +106,7 @@ function roadWidthFor(bounds: NetworkGeometry["bounds"]): number {
  * The cosmetic pavement plaza's own size, shared between `drawStatic` (which
  * draws it) and `drawSignals` (which needs to know where its outer edge
  * is): the real network's inbound lanes connect only a few units from the
- * junction center, but the widened, multi-lane carriageway this canvas
+ * junction center, but the widened single-lane carriageway this canvas
  * draws is anchored on `armReach` out from the center instead, so
  * anything meant to sit "just past the plaza" (signal ticks, the
  * crosswalk) has to measure from the center + `armReach`, not from the
@@ -150,8 +146,8 @@ function signalTickGeometryFor(laneWidth: number) {
  */
 function laneArrowGeometryFor(laneWidth: number) {
   return {
-    length: laneWidth * 1.1,
-    width: laneWidth * 0.5,
+    length: laneWidth * 0.19,
+    width: laneWidth * 0.14,
     gap: laneWidth * 0.25,
   };
 }
@@ -239,6 +235,7 @@ function clamp(value: number, min: number, max: number): number {
 // how far in a viewer can get before individual lanes and vehicles fill
 // the frame.
 const MIN_ZOOM_LEVEL = 1;
+const DEFAULT_ZOOM_LEVEL = 2;
 const MAX_ZOOM_LEVEL = 6;
 const WHEEL_ZOOM_SENSITIVITY = 0.0016;
 const ZOOM_BUTTON_STEP = 1.5;
@@ -436,7 +433,7 @@ export function JunctionPixiCanvas({
   // be null when that continuation runs. Reading through this ref instead
   // always sees the latest value, regardless of when the promise resolves.
   const trafficStateRef = React.useRef(trafficState);
-  const zoomRef = React.useRef(MIN_ZOOM_LEVEL);
+  const zoomRef = React.useRef(DEFAULT_ZOOM_LEVEL);
   const panRef = React.useRef({ x: 0, y: 0 });
   const viewControlsRef = React.useRef<{
     zoomIn: () => void;
@@ -444,7 +441,7 @@ export function JunctionPixiCanvas({
     reset: () => void;
   } | null>(null);
   const cleanupInteractionRef = React.useRef<(() => void) | null>(null);
-  const [zoomPct, setZoomPct] = React.useState(100);
+  const [zoomPct, setZoomPct] = React.useState(DEFAULT_ZOOM_LEVEL * 100);
 
   geometryRef.current = geometry;
   trafficStateRef.current = trafficState;
@@ -680,7 +677,10 @@ export function JunctionPixiCanvas({
     // applied per frame so the glyphs stay a constant, legible screen size.
     const labelLayer = labelLayerRef.current;
     if (labelLayer) {
-      const labelDistance = armReach + roadWidth * 0.5;
+      const labelDistance = Math.max(
+        armReach + roadWidth * 0.5,
+        Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) * 0.13,
+      );
       const labelLateralOffset = roadWidth + laneWidth;
       const anchors = directionLabelAnchors(
         geo,
@@ -933,7 +933,9 @@ export function JunctionPixiCanvas({
         container.y = sy;
         container.rotation = (pose.rotation * Math.PI) / 180;
         container.scale.set(
-          laneWidth * 0.32,
+          vehicle.vehicleType === "motorcycle"
+            ? laneWidth * 0.3
+            : laneWidth * 0.2,
           pose.length / (2 * halfShapeLength),
         );
         layer.addChild(container);
@@ -953,7 +955,10 @@ export function JunctionPixiCanvas({
           toRotation: pose.rotation,
           fromLength: pose.length,
           toLength: pose.length,
-          width: laneWidth * 0.32,
+          width:
+            vehicle.vehicleType === "motorcycle"
+              ? laneWidth * 0.3
+              : laneWidth * 0.2,
           halfShapeLength,
           exitAtEdge: false,
           startedAt: now,
