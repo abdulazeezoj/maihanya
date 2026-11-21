@@ -39,6 +39,7 @@ class FakeVehicleApi:
         self.positions: dict[str, tuple[float, float]] = {}
         self.angles: dict[str, float] = {}
         self.type_ids: dict[str, str] = {}
+        self.lengths: dict[str, float] = {}
 
     def getIDList(self) -> list[str]:
         return self.ids
@@ -51,6 +52,9 @@ class FakeVehicleApi:
 
     def getAngle(self, vehicle_id: str) -> float:
         return self.angles.get(vehicle_id, 0.0)
+
+    def getLength(self, vehicle_id: str) -> float:
+        return self.lengths.get(vehicle_id, 5.0)
 
     def getTypeID(self, vehicle_id: str) -> str:
         if vehicle_id in self.type_ids:
@@ -111,6 +115,7 @@ def test_extract_traffic_state_includes_network_wide_vehicle_positions():
     }
     vehicle.angles = {"ambulance-1": 90.0, "car-1": 180.0, "bike-1": 45.0}
     vehicle.type_ids = {"bike-1": "motorcycle"}
+    vehicle.lengths = {"bike-1": 2.2}
     conn = FakeConnection(edge, vehicle)
 
     state = extract_traffic_state(
@@ -125,3 +130,4 @@ def test_extract_traffic_state_includes_network_wide_vehicle_positions():
     assert car.vehicle_type == "car"
     bike = next(v for v in state.vehicles if v.vehicle_id == "bike-1")
     assert bike.vehicle_type == "motorcycle"
+    assert bike.length_meters == 2.2

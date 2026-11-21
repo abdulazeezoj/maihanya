@@ -40,6 +40,28 @@ export const VEHICLE_SIZE_SCALE: Record<VehicleType, number> = {
   emergency: 1.25,
 };
 
+// Colours are shared by the map and its legend. Lengths are fallbacks for
+// older relay snapshots; current snapshots carry the actual SUMO length.
+export const VEHICLE_COLOR: Record<VehicleType, string> = {
+  car: "#ffd447",
+  motorcycle: "#dc9cff",
+  bus: "#50b9ed",
+  truck: "#f49a4c",
+  emergency: "#f35f64",
+};
+export const VEHICLE_LENGTH: Record<VehicleType, number> = {
+  car: 5,
+  motorcycle: 2.2,
+  bus: 12,
+  truck: 8,
+  emergency: 6,
+};
+
+/** Shortest signed change in heading, including wraparound at north. */
+export function shortestAngleDelta(from: number, to: number): number {
+  return ((((to - from + 180) % 360) + 360) % 360) - 180;
+}
+
 export interface ScenePoint {
   x: number;
   y: number;
@@ -82,6 +104,131 @@ export function toSceneSpace(
   [x, y]: [number, number],
 ): [number, number] {
   return [x - bounds.minX, bounds.maxY - y];
+}
+
+/** Map SUMO coordinates onto the enlarged junction drawn by the canvas.
+ * The transform is continuous at lane centers and stop lines, including
+ * inside the junction, so vehicles follow the same path through turns.
+ */
+export function displayVehiclePosition(
+  geometry: NetworkGeometry,
+  point: [number, number],
+  laneWidth: number,
+  stopDistance: number,
+): [number, number] {
+  const center = junctionCenter(geometry);
+  const positions = signalPositions(geometry);
+
+  const mapAxis = (value: number, origin: number, axis: 0 | 1): number => {
+    const delta = value - origin;
+    const positive = delta >= 0;
+    const direction =
+      axis === 0 ? (positive ? "east" : "west") : positive ? "north" : "south";
+    const perpendicular = axis === 0 ? "north" : "east";
+    const stop = positions[direction]?.stop;
+    const lane = positions[perpendicular]?.stop;
+    if (!stop || !lane) return value;
+    const actualLane = Math.abs(lane[axis] - origin);
+    const actualStop = Math.abs(stop[axis] - origin);
+    const outer =
+      axis === 0
+        ? positive
+          ? geometry.bounds.maxX
+          : geometry.bounds.minX
+        : positive
+          ? geometry.bounds.maxY
+          : geometry.bounds.minY;
+    const actualOuter = Math.abs(outer - origin);
+    const displayLane = laneWidth / 2;
+    if (
+      actualLane <= 0 ||
+      actualStop <= actualLane ||
+      actualOuter <= actualStop ||
+      stopDistance >= actualOuter
+    )
+      return value;
+    const distance = Math.abs(delta);
+    let mapped: number;
+    if (distance <= actualLane) mapped = (distance * displayLane) / actualLane;
+    else if (distance <= actualStop)
+      mapped =
+        displayLane +
+        ((distance - actualLane) * (stopDistance - displayLane)) /
+          (actualStop - actualLane);
+    else
+      mapped =
+        stopDistance +
+        ((distance - actualStop) * (actualOuter - stopDistance)) /
+          (actualOuter - actualStop);
+    return origin + Math.sign(delta) * mapped;
+  };
+
+  return [mapAxis(point[0], center.x, 0), mapAxis(point[1], center.y, 1)];
+}
+
+/** Continue a departing vehicle only when its heading reaches a nearby map edge. */
+export function vehicleExitTarget(
+  x: number,
+  y: number,
+  rotation: number,
+  length: number,
+  width: number,
+  height: number,
+): [number, number] | null {
+  const angle = (rotation * Math.PI) / 180;
+  const dx = Math.sin(angle);
+  const dy = -Math.cos(angle);
+  const tx = dx > 0.01 ? (width - x) / dx : dx < -0.01 ? -x / dx : Infinity;
+  const ty = dy > 0.01 ? (height - y) / dy : dy < -0.01 ? -y / dy : Infinity;
+  const distance = Math.min(tx, ty);
+  return distance >= 0 && distance < 25
+    ? [x + dx * (distance + length), y + dy * (distance + length)]
+    : null;
+}
+
+/** Transform both bumpers so compressed road geometry preserves queue gaps. */
+export function vehicleDisplayPose(
+  geometry: NetworkGeometry,
+  vehicle: {
+    x: number;
+    y: number;
+    angleDeg: number;
+    vehicleType: VehicleType;
+    lengthMeters?: number | null;
+  },
+  laneWidth: number,
+  stopDistance: number,
+) {
+  const angle = (vehicle.angleDeg * Math.PI) / 180;
+  const length = vehicle.lengthMeters ?? VEHICLE_LENGTH[vehicle.vehicleType];
+  const front = toSceneSpace(
+    geometry.bounds,
+    displayVehiclePosition(
+      geometry,
+      [vehicle.x, vehicle.y],
+      laneWidth,
+      stopDistance,
+    ),
+  );
+  const rear = toSceneSpace(
+    geometry.bounds,
+    displayVehiclePosition(
+      geometry,
+      [
+        vehicle.x - Math.sin(angle) * length,
+        vehicle.y - Math.cos(angle) * length,
+      ],
+      laneWidth,
+      stopDistance,
+    ),
+  );
+  return {
+    x: (front[0] + rear[0]) / 2,
+    y: (front[1] + rear[1]) / 2,
+    length: Math.hypot(front[0] - rear[0], front[1] - rear[1]),
+    rotation:
+      (Math.atan2(front[0] - rear[0], rear[1] - front[1]) * 180) / Math.PI,
+  };
 }
 
 export interface SignalPosition {

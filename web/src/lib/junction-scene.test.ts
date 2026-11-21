@@ -7,15 +7,19 @@ import {
   crosswalkAnchors,
   DIRECTIONS,
   directionLabelAnchors,
+  displayVehiclePosition,
   junctionCenter,
   junctionPavementOutline,
   motorcycleShape,
   offsetRibbon,
+  shortestAngleDelta,
   signalPositions,
   signalStateFor,
   toSceneSpace,
   truckShape,
   VEHICLE_SHAPE,
+  vehicleDisplayPose,
+  vehicleExitTarget,
 } from "@/lib/junction-scene";
 import { makeNetworkGeometry } from "@/lib/test-fixtures";
 
@@ -292,5 +296,114 @@ describe("vehicle shapes", () => {
   it("maps every VehicleType to a shape function, with emergency reusing car", () => {
     expect(VEHICLE_SHAPE.emergency(10)).toEqual(VEHICLE_SHAPE.car(10));
     expect(VEHICLE_SHAPE.bus(10)).not.toEqual(VEHICLE_SHAPE.car(10));
+  });
+});
+
+describe("displayVehiclePosition", () => {
+  it("aligns inbound lane centers and stop lines for all four approaches", () => {
+    const geometry = makeNetworkGeometry();
+    const expected: Record<string, [number, number]> = {
+      north: [141.75, 197],
+      south: [158.25, 103],
+      east: [197, 158.25],
+      west: [103, 141.75],
+    };
+    for (const direction of DIRECTIONS) {
+      const lane = geometry.lanes.find(
+        (item) => item.direction === direction && item.kind === "in",
+      );
+      if (!lane) throw new Error("missing inbound lane");
+      const stop = lane.shape[lane.shape.length - 1];
+      const mapped = displayVehiclePosition(geometry, stop, 16.5, 47);
+      expect(mapped[0]).toBeCloseTo(expected[direction][0]);
+      expect(mapped[1]).toBeCloseTo(expected[direction][1]);
+      const nearStop: [number, number] = [
+        stop[0] * 0.99 + lane.shape[0][0] * 0.01,
+        stop[1] * 0.99 + lane.shape[0][1] * 0.01,
+      ];
+      const before = displayVehiclePosition(geometry, nearStop, 16.5, 47);
+      expect(Math.hypot(before[0] - 150, before[1] - 150)).toBeGreaterThan(
+        Math.hypot(mapped[0] - 150, mapped[1] - 150),
+      );
+    }
+  });
+
+  it("keeps movement continuous at lane centers and stop lines", () => {
+    const geometry = makeNetworkGeometry();
+    for (const x of [148.4, 150, 151.6, 157.2]) {
+      const a = displayVehiclePosition(
+        geometry,
+        [x - 0.00001, 151.6],
+        16.5,
+        47,
+      );
+      const b = displayVehiclePosition(
+        geometry,
+        [x + 0.00001, 151.6],
+        16.5,
+        47,
+      );
+      expect(Math.abs(a[0] - b[0])).toBeLessThan(0.001);
+    }
+  });
+});
+
+describe("vehicleDisplayPose", () => {
+  it("preserves bumper spacing for mixed vehicles queued behind a red light", () => {
+    const geometry = makeNetworkGeometry();
+    const lead = vehicleDisplayPose(
+      geometry,
+      { x: 151.6, y: 141.8, angleDeg: 0, vehicleType: "bus", lengthMeters: 12 },
+      16.5,
+      47,
+    );
+    const follower = vehicleDisplayPose(
+      geometry,
+      { x: 151.6, y: 127.3, angleDeg: 0, vehicleType: "car", lengthMeters: 5 },
+      16.5,
+      47,
+    );
+    expect(lead.y + lead.length / 2).toBeLessThan(
+      follower.y - follower.length / 2,
+    );
+    expect(lead.x).toBeCloseTo(follower.x);
+    expect(lead.rotation).toBeCloseTo(0);
+  });
+  it("keeps SUMO headings for all straight approaches", () => {
+    const geometry = makeNetworkGeometry();
+    for (const [x, y, angle] of [
+      [148.4, 200, 180],
+      [151.6, 100, 0],
+      [200, 151.6, 270],
+      [100, 148.4, 90],
+    ]) {
+      const pose = vehicleDisplayPose(
+        geometry,
+        { x, y, angleDeg: angle, vehicleType: "car", lengthMeters: 5 },
+        16.5,
+        47,
+      );
+      expect((pose.rotation + 360) % 360).toBeCloseTo(angle);
+    }
+  });
+});
+
+describe("shortestAngleDelta", () => {
+  it("keeps the same heading still and crosses north without spinning", () => {
+    expect(shortestAngleDelta(0, 0)).toBe(0);
+    expect(shortestAngleDelta(180, 180)).toBe(0);
+    expect(shortestAngleDelta(359, 1)).toBe(2);
+    expect(shortestAngleDelta(1, 359)).toBe(-2);
+  });
+});
+
+describe("vehicleExitTarget", () => {
+  it("continues past the edge in the current direction", () => {
+    expect(vehicleExitTarget(150, 5, 0, 5, 300, 300)).toEqual([150, -5]);
+    expect(vehicleExitTarget(295, 150, 90, 5, 300, 300)?.[0]).toBeCloseTo(305);
+  });
+  it("does not invent an exit for a vehicle missing in the middle or heading inward", () => {
+    expect(vehicleExitTarget(150, 150, 0, 5, 300, 300)).toBeNull();
+    expect(vehicleExitTarget(150, 5, 180, 5, 300, 300)).toBeNull();
   });
 });

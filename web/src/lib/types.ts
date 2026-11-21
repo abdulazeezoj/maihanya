@@ -40,6 +40,7 @@ export interface VehiclePosition {
   y: number;
   angleDeg: number;
   vehicleType: VehicleType;
+  lengthMeters?: number | null;
 }
 
 export interface TrafficState {

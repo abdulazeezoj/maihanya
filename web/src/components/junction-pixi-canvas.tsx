@@ -19,11 +19,14 @@ import {
   junctionCenter,
   junctionPavementOutline,
   offsetRibbon,
+  shortestAngleDelta,
   signalPositions,
   signalStateFor,
   toSceneSpace,
+  VEHICLE_COLOR,
   VEHICLE_SHAPE,
-  VEHICLE_SIZE_SCALE,
+  vehicleDisplayPose,
+  vehicleExitTarget,
 } from "@/lib/junction-scene";
 import type {
   ApproachDirection,
@@ -48,14 +51,12 @@ const SIGNAL_COLOR: Record<"red" | "yellow" | "green", number> = {
   yellow: 0xeab308,
   green: 0x22c55e,
 };
-const VEHICLE_FILL = 0xffcc33;
 const VEHICLE_OUTLINE = 0x3a2b00;
-const EMERGENCY_FILL = 0xef4444;
 const EMERGENCY_BEACON = [0xef4444, 0x3b82f6];
 const LABEL_FILL = 0xffffff;
 const LABEL_STROKE = 0x1a1a1a;
 
-const TWEEN_MS = 900;
+const TWEEN_MS = 1000;
 const EMERGENCY_BEACON_PERIOD_MS = 600;
 
 // Typical single-approach green window used only to give the phase-elapsed
@@ -229,10 +230,6 @@ function fitTransform(
   };
 }
 
-function easeInOutCubic(t: number): number {
-  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
-}
-
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
@@ -264,10 +261,6 @@ function clampPan(
   const maxX = (sceneW / 2) * (1 - 1 / zoom);
   const maxY = (sceneH / 2) * (1 - 1 / zoom);
   return { x: clamp(pan.x, -maxX, maxX), y: clamp(pan.y, -maxY, maxY) };
-}
-
-function shortestAngleDelta(from: number, to: number): number {
-  return ((((to - from + 180) % 360) + 540) % 360) - 180;
 }
 
 /** Perpendicular unit normal of a single straight segment (left of travel direction). */
@@ -405,8 +398,13 @@ interface VehicleSprite {
   toX: number;
   toY: number;
   toRotation: number;
+  fromLength: number;
+  toLength: number;
+  width: number;
+  halfShapeLength: number;
   startedAt: number;
   removing: boolean;
+  exitAtEdge: boolean;
 }
 
 export function JunctionPixiCanvas({
@@ -877,19 +875,25 @@ export function JunctionPixiCanvas({
     const layer = vehicleLayerRef.current;
     if (!scene || !layer) return;
     const geo = geometryRef.current;
-    const extent = Math.max(
-      geo.bounds.maxX - geo.bounds.minX,
-      geo.bounds.maxY - geo.bounds.minY,
-    );
     const vehicles = trafficStateRef.current?.vehicles ?? [];
     const seen = new Set<string>();
     const now = performance.now();
 
     for (const vehicle of vehicles) {
       seen.add(vehicle.vehicleId);
-      const [sx, sy] = toSceneSpace(geo.bounds, [vehicle.x, vehicle.y]);
+      const laneWidth = laneWidthFor(geo.bounds);
+      const tick = signalTickGeometryFor(laneWidth);
+      const stopDistance =
+        pavementGeometryFor(geo.bounds).armReach + tick.gap + tick.thickness;
+      const pose = vehicleDisplayPose(geo, vehicle, laneWidth, stopDistance);
+      const { x: sx, y: sy } = pose;
       let sprite = vehiclesRef.current.get(vehicle.vehicleId);
-      const size = extent * 0.017 * VEHICLE_SIZE_SCALE[vehicle.vehicleType];
+      const size = 1;
+      const halfShapeLength = Math.max(
+        ...VEHICLE_SHAPE[vehicle.vehicleType](size).map((point) =>
+          Math.abs(point[1]),
+        ),
+      );
 
       if (!sprite) {
         const isEmergency = vehicle.vehicleType === "emergency";
@@ -898,12 +902,24 @@ export function JunctionPixiCanvas({
         const body = new Graphics();
         body
           .poly(shape)
-          .fill(isEmergency ? EMERGENCY_FILL : VEHICLE_FILL)
+          .fill(VEHICLE_COLOR[vehicle.vehicleType])
           .stroke({
             width: size * 0.1,
             color: VEHICLE_OUTLINE,
             alpha: 0.7,
           });
+        // Roof markings distinguish vehicle types as well as their colours.
+        if (vehicle.vehicleType === "bus") {
+          body.rect(-0.28, -0.75, 0.56, 0.28).fill(0xf5fbff);
+          body.rect(-0.28, -0.15, 0.56, 0.28).fill(0xf5fbff);
+        } else if (vehicle.vehicleType === "truck") {
+          body.rect(-0.35, -0.75, 0.7, 0.35).fill(0xffedcc);
+        } else if (vehicle.vehicleType === "car") {
+          body.rect(-0.28, -0.38, 0.56, 0.4).fill(0xfff7ca);
+        } else if (vehicle.vehicleType === "emergency") {
+          body.rect(-0.32, -0.18, 0.64, 0.17).fill(0xffffff);
+          body.rect(-0.09, -0.42, 0.18, 0.65).fill(0xffffff);
+        }
 
         const container = new Container();
         container.addChild(body);
@@ -915,9 +931,11 @@ export function JunctionPixiCanvas({
         }
         container.x = sx;
         container.y = sy;
-        container.rotation = (vehicle.angleDeg * Math.PI) / 180;
-        container.alpha = 0;
-        container.scale.set(0.4);
+        container.rotation = (pose.rotation * Math.PI) / 180;
+        container.scale.set(
+          laneWidth * 0.32,
+          pose.length / (2 * halfShapeLength),
+        );
         layer.addChild(container);
 
         sprite = {
@@ -929,10 +947,15 @@ export function JunctionPixiCanvas({
           type: vehicle.vehicleType,
           fromX: sx,
           fromY: sy,
-          fromRotation: vehicle.angleDeg,
+          fromRotation: pose.rotation,
           toX: sx,
           toY: sy,
-          toRotation: vehicle.angleDeg,
+          toRotation: pose.rotation,
+          fromLength: pose.length,
+          toLength: pose.length,
+          width: laneWidth * 0.32,
+          halfShapeLength,
+          exitAtEdge: false,
           startedAt: now,
           removing: false,
         };
@@ -942,20 +965,41 @@ export function JunctionPixiCanvas({
 
       sprite.removing = false;
       const currentT = Math.min((now - sprite.startedAt) / TWEEN_MS, 1);
-      const eased = easeInOutCubic(currentT);
+      const eased = currentT;
       sprite.fromX = sprite.fromX + (sprite.toX - sprite.fromX) * eased;
       sprite.fromY = sprite.fromY + (sprite.toY - sprite.fromY) * eased;
       sprite.fromRotation =
         sprite.fromRotation +
         shortestAngleDelta(sprite.fromRotation, sprite.toRotation) * eased;
+      sprite.fromLength += (sprite.toLength - sprite.fromLength) * eased;
+      sprite.toLength = pose.length;
       sprite.toX = sx;
       sprite.toY = sy;
-      sprite.toRotation = vehicle.angleDeg;
+      sprite.toRotation = pose.rotation;
       sprite.startedAt = now;
     }
 
     for (const [id, sprite] of vehiclesRef.current) {
       if (!seen.has(id) && !sprite.removing) {
+        const t = Math.min((now - sprite.startedAt) / TWEEN_MS, 1);
+        sprite.fromX += (sprite.toX - sprite.fromX) * t;
+        sprite.fromY += (sprite.toY - sprite.fromY) * t;
+        sprite.fromRotation +=
+          shortestAngleDelta(sprite.fromRotation, sprite.toRotation) * t;
+        sprite.fromLength += (sprite.toLength - sprite.fromLength) * t;
+        const target = vehicleExitTarget(
+          sprite.fromX,
+          sprite.fromY,
+          sprite.fromRotation,
+          sprite.fromLength,
+          geo.bounds.maxX - geo.bounds.minX,
+          geo.bounds.maxY - geo.bounds.minY,
+        );
+        sprite.exitAtEdge = target !== null;
+        sprite.toX = target?.[0] ?? sprite.fromX;
+        sprite.toY = target?.[1] ?? sprite.fromY;
+        sprite.toRotation = sprite.fromRotation;
+        sprite.toLength = sprite.fromLength;
         sprite.removing = true;
         sprite.startedAt = now;
       }
@@ -994,6 +1038,16 @@ export function JunctionPixiCanvas({
         const congestionLayer = new Graphics();
         const signalLayer = new Container();
         const vehicleLayer = new Container();
+        const vehicleMask = new Graphics()
+          .rect(
+            0,
+            0,
+            geometryRef.current.bounds.maxX - geometryRef.current.bounds.minX,
+            geometryRef.current.bounds.maxY - geometryRef.current.bounds.minY,
+          )
+          .fill(0xffffff);
+        vehicleLayer.addChild(vehicleMask);
+        vehicleLayer.mask = vehicleMask;
         const labelLayer = new Container();
         const world = new Container();
         world.addChild(
@@ -1228,30 +1282,27 @@ export function JunctionPixiCanvas({
           const now = performance.now();
           for (const [id, sprite] of vehiclesRef.current) {
             const t = Math.min((now - sprite.startedAt) / TWEEN_MS, 1);
-            const eased = easeInOutCubic(t);
-
-            if (sprite.removing) {
-              sprite.container.alpha = 1 - eased;
-              sprite.container.scale.set(1 - eased * 0.6);
-              if (t >= 1) {
-                sprite.container.destroy({ children: true });
-                vehiclesRef.current.delete(id);
-              }
+            if (sprite.removing && t >= 1) {
+              sprite.container.destroy({ children: true, context: true });
+              vehiclesRef.current.delete(id);
               continue;
             }
-
-            sprite.container.alpha = Math.min(sprite.container.alpha + 0.08, 1);
-            const scaleNow = Math.min(sprite.container.scale.x + 0.08, 1);
-            sprite.container.scale.set(scaleNow);
-            sprite.container.x =
-              sprite.fromX + (sprite.toX - sprite.fromX) * eased;
-            sprite.container.y =
-              sprite.fromY + (sprite.toY - sprite.fromY) * eased;
-            const rotation =
-              sprite.fromRotation +
-              shortestAngleDelta(sprite.fromRotation, sprite.toRotation) *
-                eased;
-            sprite.container.rotation = (rotation * Math.PI) / 180;
+            sprite.container.alpha =
+              sprite.removing && !sprite.exitAtEdge ? 1 - t : 1;
+            sprite.container.x = sprite.fromX + (sprite.toX - sprite.fromX) * t;
+            sprite.container.y = sprite.fromY + (sprite.toY - sprite.fromY) * t;
+            sprite.container.rotation =
+              ((sprite.fromRotation +
+                shortestAngleDelta(sprite.fromRotation, sprite.toRotation) *
+                  t) *
+                Math.PI) /
+              180;
+            const length =
+              sprite.fromLength + (sprite.toLength - sprite.fromLength) * t;
+            sprite.container.scale.set(
+              sprite.width,
+              length / (2 * sprite.halfShapeLength),
+            );
 
             if (sprite.type === "emergency" && sprite.beacon) {
               const phase =

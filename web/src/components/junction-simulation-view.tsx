@@ -14,12 +14,12 @@ import {
 import {
   DIRECTION_LABEL,
   emergencyDirections,
+  VEHICLE_COLOR,
   VEHICLE_LABEL,
   VEHICLE_SHAPE,
-  VEHICLE_SIZE_SCALE,
   VEHICLE_TYPES,
 } from "@/lib/junction-scene";
-import type { NetworkGeometry, TrafficState, VehicleType } from "@/lib/types";
+import type { NetworkGeometry, TrafficState } from "@/lib/types";
 
 function emergencySummary(trafficState: TrafficState): string {
   const directions = emergencyDirections(trafficState);
@@ -27,10 +27,6 @@ function emergencySummary(trafficState: TrafficState): string {
   const labels = directions.map((direction) => DIRECTION_LABEL[direction]);
   return `, emergency vehicle present on ${labels.join(", ")}`;
 }
-
-const VEHICLE_FILL: Partial<Record<VehicleType, string>> = {
-  emergency: "#ef4444",
-};
 
 const JunctionPixiCanvas = dynamic(
   () => import("./junction-pixi-canvas").then((mod) => mod.JunctionPixiCanvas),
@@ -118,20 +114,39 @@ function VehicleLegend() {
     <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
       {VEHICLE_TYPES.map((type) => (
         <div key={type} className="flex items-center gap-1.5">
-          <svg
-            viewBox="-10 -10 20 20"
-            className={
-              type === "emergency" ? "size-3.5" : "size-3.5 text-foreground/70"
-            }
-          >
+          <svg viewBox="-10 -12 20 24" className="h-6 w-5" aria-hidden="true">
             <polygon
-              points={VEHICLE_SHAPE[type](8 * VEHICLE_SIZE_SCALE[type] * 0.5)
+              points={VEHICLE_SHAPE[type](
+                type === "motorcycle"
+                  ? 6
+                  : type === "car" || type === "emergency"
+                    ? 8
+                    : 7,
+              )
                 .map((p) => p.join(","))
                 .join(" ")}
-              fill={VEHICLE_FILL[type] ?? "currentColor"}
+              fill={VEHICLE_COLOR[type]}
+              stroke="#252525"
+              strokeWidth="0.7"
             />
+            {type === "car" && (
+              <rect x="-2.2" y="-3" width="4.4" height="3.2" fill="#fff7ca" />
+            )}
+            {type === "bus" && (
+              <>
+                <rect x="-2" y="-5.2" width="4" height="2" fill="#f5fbff" />
+                <rect x="-2" y="-1" width="4" height="2" fill="#f5fbff" />
+              </>
+            )}
+            {type === "truck" && (
+              <rect x="-2.5" y="-5.2" width="5" height="2.5" fill="#ffedcc" />
+            )}
             {type === "emergency" && (
-              <circle cx={0} cy={-1.2} r={2.2} fill="#3b82f6" />
+              <path
+                d="M-2.6 0h5.2M0 -2.6v5.2"
+                stroke="white"
+                strokeWidth="1.5"
+              />
             )}
           </svg>
           {VEHICLE_LABEL[type]}
