@@ -118,7 +118,7 @@ function pavementGeometryFor(bounds: NetworkGeometry["bounds"]) {
 function signalTickGeometryFor(laneWidth: number) {
   return {
     span: laneWidth * 0.78,
-    thickness: laneWidth * 0.32,
+    thickness: laneWidth * 0.12,
     gap: laneWidth * 0.15,
   };
 }
@@ -880,8 +880,8 @@ export function JunctionPixiCanvas({
         container.rotation = (pose.rotation * Math.PI) / 180;
         container.scale.set(
           vehicle.vehicleType === "motorcycle"
-            ? laneWidth * 0.3
-            : laneWidth * 0.2,
+            ? laneWidth * 0.38
+            : laneWidth * 0.28,
           pose.length / (2 * halfShapeLength),
         );
         layer.addChild(container);
@@ -903,8 +903,8 @@ export function JunctionPixiCanvas({
           toLength: pose.length,
           width:
             vehicle.vehicleType === "motorcycle"
-              ? laneWidth * 0.3
-              : laneWidth * 0.2,
+              ? laneWidth * 0.38
+              : laneWidth * 0.28,
           halfShapeLength,
           exitAtEdge: false,
           startedAt: now,
