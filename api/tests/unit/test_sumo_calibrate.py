@@ -58,14 +58,25 @@ def test_generate_routes_writes_one_flow_pair_per_direction(fit_results, tmp_pat
     flows = root.findall("flow")
     assert len(flows) == 8  # 4 directions x (civilian + emergency)
     civilian_flow_ids = {f.get("id") for f in flows if f.get("type") == "civilian"}
-    assert civilian_flow_ids == {
-        f"{d}_civilian_flow" for d in ("north", "south", "east", "west")
-    }
+    assert civilian_flow_ids == {f"{d}_civilian_flow" for d in ("north", "south", "east", "west")}
     emergency_flow_ids = {f.get("id") for f in flows if f.get("type") == "emergency"}
     assert emergency_flow_ids == {f"{d}_emergency_flow" for d in ("north", "south", "east", "west")}
     for flow in flows:
         assert "period" in flow.attrib
         assert flow.get("period", "").startswith("exp(")
+
+    distributions = root.findall("routeDistribution")
+    assert len(distributions) == 4
+    for distribution in distributions:
+        direction = distribution.attrib["id"].removesuffix("_movements")
+        routes = distribution.findall("route")
+        assert len(routes) == 3
+        assert sum(float(route.attrib["probability"]) for route in routes) == pytest.approx(1.0)
+        assert all(route.attrib["edges"].startswith(f"{direction}_in ") for route in routes)
+        assert all(route.attrib["edges"].split()[1] != f"{direction}_out" for route in routes)
+    assert all(
+        flow.get("route") == flow.attrib["id"].split("_")[0] + "_movements" for flow in flows
+    )
 
     vtype_distributions = root.findall("vTypeDistribution")
     assert len(vtype_distributions) == 1

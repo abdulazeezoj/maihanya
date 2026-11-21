@@ -266,7 +266,11 @@ MaHanya's phase space unless the actual Sapon Under-bridge Junction geometry,
 once surveyed, requires protected-turn phases (e.g. simultaneous
 non-conflicting greens), which would expand both `PhaseRecommendation`'s output
 space and the SUMO network's phase definitions. This should be confirmed once
-the real junction layout is available, not assumed permanently.
+the real junction layout is available, not assumed permanently. The current
+simulation permits straight, left and right movements from each approach under
+that approach's existing green; it does not grant simultaneous opposing greens.
+The 60% straight / 20% left / 20% right route shares are placeholder assumptions,
+not measured Sapon turning counts. No U-turns are modelled.
 
 ## Config strategy
 

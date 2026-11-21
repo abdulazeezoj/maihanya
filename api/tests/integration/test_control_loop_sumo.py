@@ -81,3 +81,38 @@ def test_control_loop_with_trained_model_if_available():
 
     assert len(decisions) == 60
     assert any(d.recommendation is not None for d in decisions)
+
+
+def test_turning_routes_run_under_single_approach_signal_control():
+    """Real SUMO turns occur while each signal phase serves just one approach."""
+    import xml.etree.ElementTree as ET
+
+    config = get_config()
+    root = ET.parse(config.simulation.net_path).getroot()
+    controlled = [c for c in root.findall("connection") if c.get("tl") == config.simulation.tls_id]
+    assert len(controlled) == 12
+    phases = root.find("tlLogic").findall("phase")
+    for phase, direction in zip(phases[::2][:4], ("north", "south", "east", "west"), strict=True):
+        state = phase.attrib["state"]
+        for connection in controlled:
+            active = state[int(connection.attrib["linkIndex"])] == "G"
+            assert active == (connection.attrib["from"] == f"{direction}_in")
+    assert set(phases[-1].attrib["state"]) == {"r"}
+
+    client = TraciClient(config.simulation.sumocfg_path, seed=123, label="integration-turning")
+    client.start()
+    turns_seen = set()
+    try:
+        for _ in range(800):
+            client.advance()
+            for vehicle_id in client._conn.vehicle.getIDList():
+                route = client._conn.vehicle.getRoute(vehicle_id)
+                if route[0] == "north_in" and route[-1] in {"east_out", "west_out"}:
+                    angle = client._conn.vehicle.getAngle(vehicle_id)
+                    if 95 < angle < 175 or 185 < angle < 265:
+                        turns_seen.add(route[-1])
+            if turns_seen == {"east_out", "west_out"}:
+                break
+    finally:
+        client.close()
+    assert turns_seen == {"east_out", "west_out"}

@@ -1,9 +1,10 @@
 """Generate a calibrated .rou.xml from fitted arrival-distribution parameters.
 
-Each direction gets one straight-through traffic flow (see
-network/plain/sapon.con.xml, no protected-turn phases) whose insertion
-rate is drawn from the fitted Poisson/negative-binomial parameters for that
-direction/period, plus a low-probability "emergency" flow per direction so
+Each direction gets one traffic flow whose insertion rate is drawn from
+the fitted Poisson/negative-binomial parameters for that direction/period.
+A route distribution chooses straight, left or right; the turning fractions
+are assumptions pending a classified turning-movement survey. A low-probability
+"emergency" flow per direction is included so
 pre-emption is exercised in generated scenarios. Civilian vehicles are
 drawn from a shared `vTypeDistribution` (VEHICLE_TYPE_MIX) rather than
 split into one flow per type: giving each type its own
@@ -30,6 +31,17 @@ DIRECTION_ROUTE: dict[ApproachDirection, tuple[str, str]] = {
     "east": ("east_in", "west_out"),
     "west": ("west_in", "east_out"),
 }
+
+# Placeholder movement shares; preserve each direction's total arrival rate.
+# Destinations are exits by cardinal location, excluding U-turns.
+TURN_SHARES = {"straight": 0.6, "left": 0.2, "right": 0.2}
+TURN_DESTINATIONS = {
+    "north": {"straight": "south", "left": "east", "right": "west"},
+    "south": {"straight": "north", "left": "west", "right": "east"},
+    "east": {"straight": "west", "left": "south", "right": "north"},
+    "west": {"straight": "east", "left": "north", "right": "south"},
+}
+
 
 #: Emergency vehicles as a small fixed fraction of a direction's flow,
 #: independent of the fitted civilian-arrival rate.
@@ -143,7 +155,18 @@ def generate_routes(
         },
     )
 
-    for direction, (from_edge, to_edge) in DIRECTION_ROUTE.items():
+    for direction, (from_edge, _to_edge) in DIRECTION_ROUTE.items():
+        distribution_id = f"{direction}_movements"
+        distribution = ET.SubElement(root, "routeDistribution", {"id": distribution_id})
+        for movement, destination in TURN_DESTINATIONS[direction].items():
+            ET.SubElement(
+                distribution,
+                "route",
+                {
+                    "edges": f"{from_edge} {destination}_out",
+                    "probability": str(TURN_SHARES[movement]),
+                },
+            )
         fit = by_direction[direction]
         veh_per_hour = mean_arrivals_per_hour(fit)
         # Exponentially distributed inter-departure times, matching a
@@ -159,8 +182,7 @@ def generate_routes(
             {
                 "id": f"{direction}_civilian_flow",
                 "type": "civilian",
-                "from": from_edge,
-                "to": to_edge,
+                "route": distribution_id,
                 "begin": "0",
                 "end": str(duration_sec),
                 "period": f"exp({veh_per_hour / 3600.0:.6f})",
@@ -175,8 +197,7 @@ def generate_routes(
                 {
                     "id": f"{direction}_emergency_flow",
                     "type": "emergency",
-                    "from": from_edge,
-                    "to": to_edge,
+                    "route": distribution_id,
                     "begin": "0",
                     "end": str(duration_sec),
                     "period": f"exp({EMERGENCY_VEH_PER_HOUR / 3600.0:.6f})",

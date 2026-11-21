@@ -1,17 +1,53 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<net xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.16" junctionCornerDetail="5" limitTurnSpeed="5.50" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/net_file.xsd">
+<net xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.20" junctionCornerDetail="5" limitTurnSpeed="5.50" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/net_file.xsd">
     <location netOffset="150.00,150.00" convBoundary="0.00,0.00,300.00,300.00" origBoundary="-150.00,-150.00,150.00,150.00" projParameter="!" />
     <edge id=":J_sapon_0" function="internal">
-        <lane id=":J_sapon_0_0" index="0" speed="13.89" length="14.40" shape="148.40,157.20 148.40,142.80" />
+        <lane id=":J_sapon_0_0" index="0" speed="6.51" length="9.03" shape="148.40,157.20 148.05,154.75 147.00,153.00 145.25,151.95 142.80,151.60" />
     </edge>
     <edge id=":J_sapon_1" function="internal">
-        <lane id=":J_sapon_1_0" index="0" speed="13.89" length="14.40" shape="157.20,151.60 142.80,151.60" />
+        <lane id=":J_sapon_1_0" index="0" speed="13.89" length="14.40" shape="148.40,157.20 148.40,142.80" />
     </edge>
     <edge id=":J_sapon_2" function="internal">
-        <lane id=":J_sapon_2_0" index="0" speed="13.89" length="14.40" shape="151.60,142.80 151.60,157.20" />
+        <lane id=":J_sapon_2_0" index="0" speed="8.00" length="4.07" shape="148.40,157.20 148.95,153.35 149.04,153.20" />
+    </edge>
+    <edge id=":J_sapon_12" function="internal">
+        <lane id=":J_sapon_12_0" index="0" speed="8.00" length="10.13" shape="149.04,153.20 150.60,150.60 153.35,148.95 157.20,148.40" />
     </edge>
     <edge id=":J_sapon_3" function="internal">
-        <lane id=":J_sapon_3_0" index="0" speed="13.89" length="14.40" shape="142.80,148.40 157.20,148.40" />
+        <lane id=":J_sapon_3_0" index="0" speed="6.51" length="9.03" shape="157.20,151.60 154.75,151.95 153.00,153.00 151.95,154.75 151.60,157.20" />
+    </edge>
+    <edge id=":J_sapon_4" function="internal">
+        <lane id=":J_sapon_4_0" index="0" speed="13.89" length="14.40" shape="157.20,151.60 142.80,151.60" />
+    </edge>
+    <edge id=":J_sapon_5" function="internal">
+        <lane id=":J_sapon_5_0" index="0" speed="8.00" length="4.07" shape="157.20,151.60 153.35,151.05 153.20,150.96" />
+    </edge>
+    <edge id=":J_sapon_13" function="internal">
+        <lane id=":J_sapon_13_0" index="0" speed="8.00" length="10.13" shape="153.20,150.96 150.60,149.40 148.95,146.65 148.40,142.80" />
+    </edge>
+    <edge id=":J_sapon_6" function="internal">
+        <lane id=":J_sapon_6_0" index="0" speed="6.51" length="9.03" shape="151.60,142.80 151.95,145.25 153.00,147.00 154.75,148.05 157.20,148.40" />
+    </edge>
+    <edge id=":J_sapon_7" function="internal">
+        <lane id=":J_sapon_7_0" index="0" speed="13.89" length="14.40" shape="151.60,142.80 151.60,157.20" />
+    </edge>
+    <edge id=":J_sapon_8" function="internal">
+        <lane id=":J_sapon_8_0" index="0" speed="8.00" length="4.07" shape="151.60,142.80 151.05,146.65 150.96,146.80" />
+    </edge>
+    <edge id=":J_sapon_14" function="internal">
+        <lane id=":J_sapon_14_0" index="0" speed="8.00" length="10.13" shape="150.96,146.80 149.40,149.40 146.65,151.05 142.80,151.60" />
+    </edge>
+    <edge id=":J_sapon_9" function="internal">
+        <lane id=":J_sapon_9_0" index="0" speed="6.51" length="9.03" shape="142.80,148.40 145.25,148.05 147.00,147.00 148.05,145.25 148.40,142.80" />
+    </edge>
+    <edge id=":J_sapon_10" function="internal">
+        <lane id=":J_sapon_10_0" index="0" speed="13.89" length="14.40" shape="142.80,148.40 157.20,148.40" />
+    </edge>
+    <edge id=":J_sapon_11" function="internal">
+        <lane id=":J_sapon_11_0" index="0" speed="8.00" length="4.07" shape="142.80,148.40 146.65,148.95 146.80,149.04" />
+    </edge>
+    <edge id=":J_sapon_15" function="internal">
+        <lane id=":J_sapon_15_0" index="0" speed="8.00" length="10.13" shape="146.80,149.04 149.40,150.60 151.05,153.35 151.60,157.20" />
     </edge>
     <edge id="east_in" from="E_end" to="J_sapon" priority="1">
         <lane id="east_in_0" index="0" speed="13.89" length="142.80" shape="300.00,151.60 157.20,151.60" />
@@ -38,32 +74,64 @@
         <lane id="west_out_0" index="0" speed="13.89" length="142.80" shape="142.80,151.60 0.00,151.60" />
     </edge>
     <tlLogic id="J_sapon" type="static" programID="mahanya" offset="0">
-        <phase duration="30" state="Grrr" />
-        <phase duration="3" state="yrrr" />
-        <phase duration="30" state="rrGr" />
-        <phase duration="3" state="rryr" />
-        <phase duration="30" state="rGrr" />
-        <phase duration="3" state="ryrr" />
-        <phase duration="30" state="rrrG" />
-        <phase duration="3" state="rrry" />
-        <phase duration="2" state="rrrr" />
+        <phase duration="30" state="GGGrrrrrrrrr" />
+        <phase duration="3" state="yyyrrrrrrrrr" />
+        <phase duration="30" state="rrrrrrGGGrrr" />
+        <phase duration="3" state="rrrrrryyyrrr" />
+        <phase duration="30" state="rrrGGGrrrrrr" />
+        <phase duration="3" state="rrryyyrrrrrr" />
+        <phase duration="30" state="rrrrrrrrrGGG" />
+        <phase duration="3" state="rrrrrrrrryyy" />
+        <phase duration="2" state="rrrrrrrrrrrr" />
     </tlLogic>
     <junction id="E_end" type="dead_end" x="300.00" y="150.00" incLanes="east_out_0" intLanes="" shape="300.00,150.00 300.00,146.80 300.00,150.00" />
-    <junction id="J_sapon" type="traffic_light" x="150.00" y="150.00" incLanes="north_in_0 east_in_0 south_in_0 west_in_0" intLanes=":J_sapon_0_0 :J_sapon_1_0 :J_sapon_2_0 :J_sapon_3_0" shape="146.80,157.20 153.20,157.20 153.64,154.98 154.20,154.20 154.98,153.64 155.98,153.31 157.20,153.20 157.20,146.80 154.98,146.36 154.20,145.80 153.64,145.02 153.31,144.02 153.20,142.80 146.80,142.80 146.36,145.02 145.80,145.80 145.02,146.36 144.02,146.69 142.80,146.80 142.80,153.20 145.02,153.64 145.80,154.20 146.36,154.98 146.69,155.98">
-        <request index="0" response="0000" foes="1010" cont="0" />
-        <request index="1" response="0101" foes="0101" cont="0" />
-        <request index="2" response="0000" foes="1010" cont="0" />
-        <request index="3" response="0101" foes="0101" cont="0" />
+    <junction id="J_sapon" type="traffic_light" x="150.00" y="150.00" incLanes="north_in_0 east_in_0 south_in_0 west_in_0" intLanes=":J_sapon_0_0 :J_sapon_1_0 :J_sapon_12_0 :J_sapon_3_0 :J_sapon_4_0 :J_sapon_13_0 :J_sapon_6_0 :J_sapon_7_0 :J_sapon_14_0 :J_sapon_9_0 :J_sapon_10_0 :J_sapon_15_0" shape="146.80,157.20 153.20,157.20 153.64,154.98 154.20,154.20 154.98,153.64 155.98,153.31 157.20,153.20 157.20,146.80 154.98,146.36 154.20,145.80 153.64,145.02 153.31,144.02 153.20,142.80 146.80,142.80 146.36,145.02 145.80,145.80 145.02,146.36 144.02,146.69 142.80,146.80 142.80,153.20 145.02,153.64 145.80,154.20 146.36,154.98 146.69,155.98">
+        <request index="0" response="000000000000" foes="000100010000" cont="0" />
+        <request index="1" response="100000100000" foes="111100110000" cont="0" />
+        <request index="2" response="100111100000" foes="110111110000" cont="1" />
+        <request index="3" response="000010000000" foes="100010000000" cont="0" />
+        <request index="4" response="000110000111" foes="100110000111" cont="0" />
+        <request index="5" response="111110000110" foes="111110000110" cont="1" />
+        <request index="6" response="000000000000" foes="010000000100" cont="0" />
+        <request index="7" response="100000100000" foes="110000111100" cont="0" />
+        <request index="8" response="100000100011" foes="110000110111" cont="1" />
+        <request index="9" response="000000000010" foes="000000100010" cont="0" />
+        <request index="10" response="000111000110" foes="000111100110" cont="0" />
+        <request index="11" response="000110011110" foes="000110111110" cont="1" />
     </junction>
     <junction id="N_end" type="dead_end" x="150.00" y="300.00" incLanes="north_out_0" intLanes="" shape="150.00,300.00 153.20,300.00 150.00,300.00" />
     <junction id="S_end" type="dead_end" x="150.00" y="0.00" incLanes="south_out_0" intLanes="" shape="150.00,0.00 146.80,0.00 150.00,0.00" />
     <junction id="W_end" type="dead_end" x="0.00" y="150.00" incLanes="west_out_0" intLanes="" shape="0.00,150.00 0.00,153.20 0.00,150.00" />
-    <connection from="east_in" to="west_out" fromLane="0" toLane="0" via=":J_sapon_1_0" tl="J_sapon" linkIndex="1" dir="s" state="o" />
-    <connection from="north_in" to="south_out" fromLane="0" toLane="0" via=":J_sapon_0_0" tl="J_sapon" linkIndex="0" dir="s" state="O" />
-    <connection from="south_in" to="north_out" fromLane="0" toLane="0" via=":J_sapon_2_0" tl="J_sapon" linkIndex="2" dir="s" state="O" />
-    <connection from="west_in" to="east_out" fromLane="0" toLane="0" via=":J_sapon_3_0" tl="J_sapon" linkIndex="3" dir="s" state="o" />
-    <connection from=":J_sapon_0" to="south_out" fromLane="0" toLane="0" dir="s" state="M" />
-    <connection from=":J_sapon_1" to="west_out" fromLane="0" toLane="0" dir="s" state="M" />
-    <connection from=":J_sapon_2" to="north_out" fromLane="0" toLane="0" dir="s" state="M" />
-    <connection from=":J_sapon_3" to="east_out" fromLane="0" toLane="0" dir="s" state="M" />
+    <junction id=":J_sapon_12_0" type="internal" x="149.04" y="153.20" incLanes=":J_sapon_2_0 south_in_0" intLanes=":J_sapon_4_0 :J_sapon_5_0 :J_sapon_6_0 :J_sapon_7_0 :J_sapon_10_0 :J_sapon_11_0" />
+    <junction id=":J_sapon_13_0" type="internal" x="153.20" y="150.96" incLanes=":J_sapon_5_0 west_in_0" intLanes=":J_sapon_1_0 :J_sapon_2_0 :J_sapon_7_0 :J_sapon_8_0 :J_sapon_9_0 :J_sapon_10_0" />
+    <junction id=":J_sapon_14_0" type="internal" x="150.96" y="146.80" incLanes=":J_sapon_8_0 north_in_0" intLanes=":J_sapon_0_0 :J_sapon_1_0 :J_sapon_4_0 :J_sapon_5_0 :J_sapon_10_0 :J_sapon_11_0" />
+    <junction id=":J_sapon_15_0" type="internal" x="146.80" y="149.04" incLanes=":J_sapon_11_0 east_in_0" intLanes=":J_sapon_1_0 :J_sapon_2_0 :J_sapon_3_0 :J_sapon_4_0 :J_sapon_7_0 :J_sapon_8_0" />
+    <connection from="east_in" to="north_out" fromLane="0" toLane="0" via=":J_sapon_3_0" tl="J_sapon" linkIndex="3" dir="r" state="o" />
+    <connection from="east_in" to="west_out" fromLane="0" toLane="0" via=":J_sapon_4_0" tl="J_sapon" linkIndex="4" dir="s" state="o" />
+    <connection from="east_in" to="south_out" fromLane="0" toLane="0" via=":J_sapon_5_0" tl="J_sapon" linkIndex="5" dir="l" state="o" />
+    <connection from="north_in" to="west_out" fromLane="0" toLane="0" via=":J_sapon_0_0" tl="J_sapon" linkIndex="0" dir="r" state="O" />
+    <connection from="north_in" to="south_out" fromLane="0" toLane="0" via=":J_sapon_1_0" tl="J_sapon" linkIndex="1" dir="s" state="O" />
+    <connection from="north_in" to="east_out" fromLane="0" toLane="0" via=":J_sapon_2_0" tl="J_sapon" linkIndex="2" dir="l" state="o" />
+    <connection from="south_in" to="east_out" fromLane="0" toLane="0" via=":J_sapon_6_0" tl="J_sapon" linkIndex="6" dir="r" state="O" />
+    <connection from="south_in" to="north_out" fromLane="0" toLane="0" via=":J_sapon_7_0" tl="J_sapon" linkIndex="7" dir="s" state="O" />
+    <connection from="south_in" to="west_out" fromLane="0" toLane="0" via=":J_sapon_8_0" tl="J_sapon" linkIndex="8" dir="l" state="o" />
+    <connection from="west_in" to="south_out" fromLane="0" toLane="0" via=":J_sapon_9_0" tl="J_sapon" linkIndex="9" dir="r" state="o" />
+    <connection from="west_in" to="east_out" fromLane="0" toLane="0" via=":J_sapon_10_0" tl="J_sapon" linkIndex="10" dir="s" state="o" />
+    <connection from="west_in" to="north_out" fromLane="0" toLane="0" via=":J_sapon_11_0" tl="J_sapon" linkIndex="11" dir="l" state="o" />
+    <connection from=":J_sapon_0" to="west_out" fromLane="0" toLane="0" dir="r" state="M" />
+    <connection from=":J_sapon_1" to="south_out" fromLane="0" toLane="0" dir="s" state="M" />
+    <connection from=":J_sapon_2" to="east_out" fromLane="0" toLane="0" via=":J_sapon_12_0" dir="l" state="m" />
+    <connection from=":J_sapon_12" to="east_out" fromLane="0" toLane="0" dir="l" state="M" />
+    <connection from=":J_sapon_3" to="north_out" fromLane="0" toLane="0" dir="r" state="M" />
+    <connection from=":J_sapon_4" to="west_out" fromLane="0" toLane="0" dir="s" state="M" />
+    <connection from=":J_sapon_5" to="south_out" fromLane="0" toLane="0" via=":J_sapon_13_0" dir="l" state="m" />
+    <connection from=":J_sapon_13" to="south_out" fromLane="0" toLane="0" dir="l" state="M" />
+    <connection from=":J_sapon_6" to="east_out" fromLane="0" toLane="0" dir="r" state="M" />
+    <connection from=":J_sapon_7" to="north_out" fromLane="0" toLane="0" dir="s" state="M" />
+    <connection from=":J_sapon_8" to="west_out" fromLane="0" toLane="0" via=":J_sapon_14_0" dir="l" state="m" />
+    <connection from=":J_sapon_14" to="west_out" fromLane="0" toLane="0" dir="l" state="M" />
+    <connection from=":J_sapon_9" to="south_out" fromLane="0" toLane="0" dir="r" state="M" />
+    <connection from=":J_sapon_10" to="east_out" fromLane="0" toLane="0" dir="s" state="M" />
+    <connection from=":J_sapon_11" to="north_out" fromLane="0" toLane="0" via=":J_sapon_15_0" dir="l" state="m" />
+    <connection from=":J_sapon_15" to="north_out" fromLane="0" toLane="0" dir="l" state="M" />
 </net>
