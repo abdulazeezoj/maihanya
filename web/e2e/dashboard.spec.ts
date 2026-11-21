@@ -162,6 +162,69 @@ test("live junction view renders a Pixi canvas once a scenario's geometry loads"
   await expect(junction.locator("canvas")).toBeVisible();
 });
 
+test("road arms remain paved where they meet the junction at multiple zoom levels", async ({
+  page,
+}) => {
+  await page.route("**/api/scenarios/*/network", (route) =>
+    route.fulfill({ json: NETWORK_GEOMETRY }),
+  );
+  await page.route("**/api/scenarios", (route) =>
+    route.fulfill({ json: SCENARIOS }),
+  );
+  await page.goto("/");
+  await page.getByRole("combobox", { name: /select scenario/i }).click();
+  await page
+    .getByRole("option", { name: /Sapon Under-bridge: Peak Hour/i })
+    .click();
+  const canvas = page
+    .getByRole("img", { name: /live junction simulation/i })
+    .locator("canvas");
+  await expect(canvas).toBeVisible();
+  for (const zoom of [5, 5 / 1.5]) {
+    if (zoom < 5) await page.locator('button[aria-label="Zoom out"]').click();
+    await expect
+      .poll(
+        async () => {
+          const png = await canvas.screenshot();
+          return page.evaluate(
+            async ({ data, zoomLevel }) => {
+              const image = new Image();
+              image.src = `data:image/png;base64,${data}`;
+              await image.decode();
+              const probe = document.createElement("canvas");
+              probe.width = image.width;
+              probe.height = image.height;
+              const ctx = probe.getContext("2d");
+              if (!ctx) throw new Error("Canvas 2D unavailable");
+              ctx.drawImage(image, 0, 0);
+              const scale =
+                (Math.min(image.width, image.height) / 300) * 0.9 * zoomLevel;
+              const cx = image.width / 2;
+              const cy = image.height / 2;
+              return [
+                [1.6, -5],
+                [1.6, 5],
+                [-5, 1.6],
+                [5, 1.6],
+              ].every(([x, y]) => {
+                const [r, g, b] = ctx.getImageData(
+                  Math.round(cx + x * scale),
+                  Math.round(cy + y * scale),
+                  1,
+                  1,
+                ).data;
+                return r < 70 && g < 70 && b < 70;
+              });
+            },
+            { data: png.toString("base64"), zoomLevel: zoom },
+          );
+        },
+        { timeout: 15_000 },
+      )
+      .toBe(true);
+  }
+});
+
 test("decision log page renders decisions with a dash for bypassed recommendations", async ({
   page,
 }) => {

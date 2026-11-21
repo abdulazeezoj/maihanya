@@ -12,6 +12,7 @@ import {
   junctionPavementOutline,
   motorcycleShape,
   offsetRibbon,
+  roadCenterline,
   shortestAngleDelta,
   signalPositions,
   signalStateFor,
@@ -499,5 +500,22 @@ describe("vehicleExitTarget", () => {
   it("does not invent an exit for a vehicle missing in the middle or heading inward", () => {
     expect(vehicleExitTarget(150, 150, 0, 5, 300, 300)).toBeNull();
     expect(vehicleExitTarget(150, 5, 180, 5, 300, 300)).toBeNull();
+  });
+});
+
+describe("roadCenterline", () => {
+  it("connects every road to the junction center while centering the outer ends", () => {
+    const geometry = makeNetworkGeometry();
+    for (const lane of geometry.lanes) {
+      const points = roadCenterline(geometry, lane);
+      const center = lane.kind === "in" ? points[points.length - 1] : points[0];
+      expect(center).toEqual([150, 150]);
+      const outer = lane.kind === "in" ? points[0] : points[points.length - 1];
+      const lateral =
+        lane.direction === "north" || lane.direction === "south"
+          ? outer[0]
+          : outer[1];
+      expect(lateral).toBeCloseTo(150);
+    }
   });
 });

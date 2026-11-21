@@ -107,6 +107,31 @@ export function junctionCenter(geometry: NetworkGeometry): ScenePoint {
   return { x: sum.x / inner.length, y: sum.y / inner.length };
 }
 
+/** Center a road arm and extend its innermost point to the junction. */
+export function roadCenterline(
+  geometry: NetworkGeometry,
+  lane: LaneGeometry,
+): [number, number][] {
+  const outer = outerEndpoint(lane);
+  const inner = innerEndpoint(lane);
+  if (!outer || !inner || lane.shape.length < 2) return [];
+  const center = junctionCenter(geometry);
+  const length = Math.hypot(inner[0] - outer[0], inner[1] - outer[1]) || 1;
+  const normal: [number, number] = [
+    (inner[1] - outer[1]) / length,
+    -(inner[0] - outer[0]) / length,
+  ];
+  const offset =
+    (inner[0] - center.x) * normal[0] + (inner[1] - center.y) * normal[1];
+  return lane.shape.map((point, index) => {
+    const isInner =
+      lane.kind === "in" ? index === lane.shape.length - 1 : index === 0;
+    return isInner
+      ? [center.x, center.y]
+      : [point[0] - normal[0] * offset, point[1] - normal[1] * offset];
+  });
+}
+
 /** Map SUMO map-space (Y-up) coordinates into scene space (Y-down, origin at bounds.min). */
 export function toSceneSpace(
   bounds: NetworkBounds,

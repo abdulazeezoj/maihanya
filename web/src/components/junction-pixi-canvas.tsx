@@ -18,6 +18,7 @@ import {
   junctionCenter,
   junctionPavementOutline,
   offsetRibbon,
+  roadCenterline,
   shortestAngleDelta,
   signalPositions,
   signalStateFor,
@@ -474,25 +475,9 @@ export function JunctionPixiCanvas({
         (lane) => lane.direction === direction && lane.kind === "in",
       );
       if (!inLane) continue;
-      // Center the two-way ribbon on the junction, not on the inbound
-      // SUMO lane (which is offset to one side of the road centerline).
-      const outer = inLane.shape[0];
-      const inner = inLane.shape[inLane.shape.length - 1];
-      const directionLength =
-        Math.hypot(inner[0] - outer[0], inner[1] - outer[1]) || 1;
-      const normal: [number, number] = [
-        (inner[1] - outer[1]) / directionLength,
-        -(inner[0] - outer[0]) / directionLength,
-      ];
-      const laneOffset =
-        (inner[0] - center.x) * normal[0] + (inner[1] - center.y) * normal[1];
-      const scenePoints = inLane.shape.map((pt, index) =>
-        toSceneSpace(
-          bounds,
-          index === inLane.shape.length - 1
-            ? [center.x, center.y]
-            : [pt[0] - normal[0] * laneOffset, pt[1] - normal[1] * laneOffset],
-        ),
+      // The centered ribbon reaches the junction so grass cannot show through.
+      const scenePoints = roadCenterline(geo, inLane).map((point) =>
+        toSceneSpace(bounds, point),
       );
       const ribbon = offsetRibbon(scenePoints, roadWidth * 2);
       if (ribbon.length > 0) {
