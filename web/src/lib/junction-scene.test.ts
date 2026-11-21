@@ -369,6 +369,32 @@ describe("vehicleDisplayPose", () => {
     expect(lead.x).toBeCloseTo(follower.x);
     expect(lead.rotation).toBeCloseTo(0);
   });
+  it("keeps a vehicle the same length before, at and after each stop line", () => {
+    const geometry = makeNetworkGeometry();
+    for (const [x, y, dx, dy, angle] of [
+      [148.4, 157.2, 0, 1, 180],
+      [151.6, 142.8, 0, -1, 0],
+      [157.2, 151.6, 1, 0, 270],
+      [142.8, 148.4, -1, 0, 90],
+    ]) {
+      const sizes = [-10, -2, 0, 2, 10, 50].map(
+        (distance) =>
+          vehicleDisplayPose(
+            geometry,
+            {
+              x: x + dx * distance,
+              y: y + dy * distance,
+              angleDeg: angle,
+              vehicleType: "bus",
+              lengthMeters: 12,
+            },
+            16.5,
+            47,
+          ).length,
+      );
+      for (const size of sizes) expect(size).toBeCloseTo(sizes[0], 8);
+    }
+  });
   it("keeps SUMO headings for all straight approaches", () => {
     const geometry = makeNetworkGeometry();
     for (const [x, y, angle] of [

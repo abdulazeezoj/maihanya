@@ -186,7 +186,51 @@ export function vehicleExitTarget(
     : null;
 }
 
-/** Transform both bumpers so compressed road geometry preserves queue gaps. */
+/** A fixed scale no greater than any segment of the road-coordinate transform. */
+function vehicleLengthScale(
+  geometry: NetworkGeometry,
+  laneWidth: number,
+  stopDistance: number,
+): number {
+  const center = junctionCenter(geometry);
+  const positions = signalPositions(geometry);
+  const scales = [1];
+  for (const direction of DIRECTIONS) {
+    const axis = direction === "east" || direction === "west" ? 0 : 1;
+    const origin = axis === 0 ? center.x : center.y;
+    const stop = positions[direction]?.stop;
+    const lane = positions[axis === 0 ? "north" : "east"]?.stop;
+    if (!stop || !lane) continue;
+    const actualLane = Math.abs(lane[axis] - origin);
+    const actualStop = Math.abs(stop[axis] - origin);
+    const outer =
+      axis === 0
+        ? direction === "east"
+          ? geometry.bounds.maxX
+          : geometry.bounds.minX
+        : direction === "north"
+          ? geometry.bounds.maxY
+          : geometry.bounds.minY;
+    const actualOuter = Math.abs(outer - origin);
+    const displayLane = laneWidth / 2;
+    if (
+      actualLane <= 0 ||
+      actualStop <= actualLane ||
+      actualOuter <= actualStop ||
+      stopDistance >= actualOuter ||
+      stopDistance <= displayLane
+    )
+      continue;
+    scales.push(
+      displayLane / actualLane,
+      (stopDistance - displayLane) / (actualStop - actualLane),
+      (actualOuter - stopDistance) / (actualOuter - actualStop),
+    );
+  }
+  return Math.min(...scales);
+}
+
+/** Map the front bumper while keeping the displayed vehicle length constant. */
 export function vehicleDisplayPose(
   geometry: NetworkGeometry,
   vehicle: {
@@ -222,12 +266,14 @@ export function vehicleDisplayPose(
       stopDistance,
     ),
   );
+  const rotation = Math.atan2(front[0] - rear[0], rear[1] - front[1]);
+  const displayLength =
+    length * vehicleLengthScale(geometry, laneWidth, stopDistance);
   return {
-    x: (front[0] + rear[0]) / 2,
-    y: (front[1] + rear[1]) / 2,
-    length: Math.hypot(front[0] - rear[0], front[1] - rear[1]),
-    rotation:
-      (Math.atan2(front[0] - rear[0], rear[1] - front[1]) * 180) / Math.PI,
+    x: front[0] - (Math.sin(rotation) * displayLength) / 2,
+    y: front[1] + (Math.cos(rotation) * displayLength) / 2,
+    length: displayLength,
+    rotation: (rotation * 180) / Math.PI,
   };
 }
 
