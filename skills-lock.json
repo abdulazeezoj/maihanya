@@ -1,0 +1,40 @@
+{
+  "version": 2,
+  "skills": {
+    "migrate-radix-to-base": {
+      "source": "shadcn-ui/ui",
+      "commit": "bfa64ff4d1cb7317d2403ecb176df6826d4caffc",
+      "sourceType": "github",
+      "skillPath": "skills/migrate-radix-to-base/SKILL.md",
+      "computedHash": "7644de21e9aa533904def58c30f809ae6574c3cabc6396ab8b03dee751e8ffbe"
+    },
+    "pixijs": {
+      "source": "pixijs/pixijs-skills",
+      "commit": "93784384269b1d8677fb2ae166c81d750cba4281",
+      "sourceType": "github",
+      "skillPath": "skills/pixijs/SKILL.md",
+      "computedHash": "07c27f721df5b1ddf896548054022ded991da53d4e796b9c8c73c2221e6ac11e"
+    },
+    "pixijs-3d": {
+      "source": "pixijs/pixijs-skills",
+      "commit": "93784384269b1d8677fb2ae166c81d750cba4281",
+      "sourceType": "github",
+      "skillPath": "skills/pixijs-3d/SKILL.md",
+      "computedHash": "e0c34b9a3d0258726dae2919b061dde079c3a6b20d0fc92c68b3d42e0179c27c"
+    },
+    "playwright-cli": {
+      "source": "microsoft/playwright-cli",
+      "commit": "c872a33cec77fa03c28fa7c6d1ad99d15d04ce42",
+      "sourceType": "github",
+      "skillPath": "skills/playwright-cli/SKILL.md",
+      "computedHash": "54c3f1e47b2566ecc3a2c1515823f77f4609edfe8029351924311dafc0d2ba66"
+    },
+    "shadcn": {
+      "source": "shadcn-ui/ui",
+      "commit": "bfa64ff4d1cb7317d2403ecb176df6826d4caffc",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "388962d16c7a4f13aaeee0d8f128e50a87df8553d42ef7988c39c0e1c74a40e8"
+    }
+  }
+}
