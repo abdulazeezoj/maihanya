@@ -432,6 +432,37 @@ describe("vehicleDisplayPose", () => {
       for (const size of sizes) expect(size).toBeCloseTo(sizes[0], 8);
     }
   });
+  it("keeps physical length-to-width and vehicle-to-lane ratios for normal vehicles", () => {
+    const geometry = makeNetworkGeometry();
+    const laneWidth = 3.2;
+    const stopDistance = laneWidth * (1.98 + 0.15 + 0.12);
+    for (const [type, length, width] of [
+      ["car", 5, 1.8],
+      ["motorcycle", 2.2, 0.8],
+      ["bus", 12, 2.5],
+      ["truck", 8, 2.5],
+      ["emergency", 6, 1.8],
+    ] as const) {
+      for (const y of [120, 142.8, 150, 170]) {
+        const pose = vehicleDisplayPose(
+          geometry,
+          {
+            x: 151.6,
+            y,
+            angleDeg: 0,
+            vehicleType: type,
+            lengthMeters: length,
+            widthMeters: width,
+          },
+          laneWidth,
+          stopDistance,
+        );
+        expect(pose.length / pose.width).toBeCloseTo(length / width, 6);
+        expect(pose.width / laneWidth).toBeCloseTo(width / laneWidth, 2);
+        expect(pose.width).toBeLessThan(laneWidth);
+      }
+    }
+  });
   it("keeps SUMO headings for all straight approaches", () => {
     const geometry = makeNetworkGeometry();
     for (const [x, y, angle] of [

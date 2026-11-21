@@ -56,6 +56,9 @@ class FakeVehicleApi:
     def getLength(self, vehicle_id: str) -> float:
         return self.lengths.get(vehicle_id, 5.0)
 
+    def getWidth(self, vehicle_id: str) -> float:
+        return 0.8 if vehicle_id == "bike-1" else 1.8
+
     def getTypeID(self, vehicle_id: str) -> str:
         if vehicle_id in self.type_ids:
             return self.type_ids[vehicle_id]
@@ -131,3 +134,4 @@ def test_extract_traffic_state_includes_network_wide_vehicle_positions():
     bike = next(v for v in state.vehicles if v.vehicle_id == "bike-1")
     assert bike.vehicle_type == "motorcycle"
     assert bike.length_meters == 2.2
+    assert bike.width_meters == 0.8

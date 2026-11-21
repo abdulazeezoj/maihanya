@@ -56,6 +56,7 @@ def load_network_geometry(net_file: Path) -> NetworkGeometry:
                     direction=direction,
                     kind=kind,
                     shape=_parse_shape(shape),
+                    width_meters=float(lane.get("width", "3.2")),
                 )
             )
 

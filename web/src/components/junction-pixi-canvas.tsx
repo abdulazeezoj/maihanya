@@ -68,38 +68,30 @@ const PHASE_PROGRESS_REFERENCE_SEC = 30;
 // never runs flush to the frame edge; leaves a grass margin on every side.
 const FRAME_MARGIN = 0.9;
 
-// Match the single inbound and outbound lane in the SUMO network. A modest
-// visual widening keeps the road legible without excessively stretching the junction.
-const LANE_WIDTH_RATIO = 0.03;
+// One lane in each direction, using the network's physical lane width.
 const LANES_PER_DIRECTION = 1;
+const ARM_REACH_RATIO = 1.98;
 
-// Keep the junction compact so the displayed speed remains close to SUMO's.
-const ARM_REACH_RATIO = 0.7;
-
-function laneWidthFor(bounds: NetworkGeometry["bounds"]): number {
-  return (
-    Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) *
-    LANE_WIDTH_RATIO
-  );
+function laneWidthFor(geometry: NetworkGeometry): number {
+  return geometry.lanes.find((lane) => lane.kind === "in")?.widthMeters ?? 3.2;
 }
 
-/** One direction's full lane block (all `LANES_PER_DIRECTION` lanes combined). */
-function roadWidthFor(bounds: NetworkGeometry["bounds"]): number {
-  return laneWidthFor(bounds) * LANES_PER_DIRECTION;
+function roadWidthFor(geometry: NetworkGeometry): number {
+  return laneWidthFor(geometry) * LANES_PER_DIRECTION;
 }
 
 /**
  * The cosmetic pavement plaza's own size, shared between `drawStatic` (which
  * draws it) and `drawSignals` (which needs to know where its outer edge
  * is): the real network's inbound lanes connect only a few units from the
- * junction center, but the widened single-lane carriageway this canvas
- * draws is anchored on `armReach` out from the center instead, so
+ * junction center. The rendered carriageway and stop marks are anchored
+ * on `armReach` out from the center, so
  * anything meant to sit "just past the plaza" (signal ticks and arrows)
  * has to measure from the center + `armReach`, not from the
  * real, close-in stop line.
  */
-function pavementGeometryFor(bounds: NetworkGeometry["bounds"]) {
-  const roadWidth = roadWidthFor(bounds);
+function pavementGeometryFor(geometry: NetworkGeometry) {
+  const roadWidth = roadWidthFor(geometry);
   return {
     roadWidth,
     armReach: roadWidth * ARM_REACH_RATIO,
@@ -220,7 +212,7 @@ function clamp(value: number, min: number, max: number): number {
 // how far in a viewer can get before individual lanes and vehicles fill
 // the frame.
 const MIN_ZOOM_LEVEL = 1;
-const DEFAULT_ZOOM_LEVEL = 2;
+const DEFAULT_ZOOM_LEVEL = 5;
 const MAX_ZOOM_LEVEL = 6;
 const WHEEL_ZOOM_SENSITIVITY = 0.0016;
 const ZOOM_BUTTON_STEP = 1.5;
@@ -437,7 +429,7 @@ export function JunctionPixiCanvas({
     if (!app || !scene) return;
     const geo = geometryRef.current;
     const { bounds } = geo;
-    const { roadWidth, armReach, cornerRadius } = pavementGeometryFor(bounds);
+    const { roadWidth, armReach, cornerRadius } = pavementGeometryFor(geo);
 
     scene.clear();
 
@@ -464,7 +456,7 @@ export function JunctionPixiCanvas({
       scene.roundShape(scenePavement, 0).fill(ASPHALT);
     }
 
-    const laneWidth = laneWidthFor(bounds);
+    const laneWidth = laneWidthFor(geo);
     const center = junctionCenter(geo);
 
     // Signals and direction arrows share the same distance from the center.
@@ -494,11 +486,13 @@ export function JunctionPixiCanvas({
       ];
       const laneOffset =
         (inner[0] - center.x) * normal[0] + (inner[1] - center.y) * normal[1];
-      const scenePoints = inLane.shape.map((pt) =>
-        toSceneSpace(bounds, [
-          pt[0] - normal[0] * laneOffset,
-          pt[1] - normal[1] * laneOffset,
-        ]),
+      const scenePoints = inLane.shape.map((pt, index) =>
+        toSceneSpace(
+          bounds,
+          index === inLane.shape.length - 1
+            ? [center.x, center.y]
+            : [pt[0] - normal[0] * laneOffset, pt[1] - normal[1] * laneOffset],
+        ),
       );
       const ribbon = offsetRibbon(scenePoints, roadWidth * 2);
       if (ribbon.length > 0) {
@@ -535,7 +529,7 @@ export function JunctionPixiCanvas({
         ]);
 
       // The centerline runs continuously up each arm to the junction mouth.
-      const dividerSpans: [number, number][] = [[roadWidth, outerDist]];
+      const dividerSpans: [number, number][] = [[tickOuterEdge, outerDist]];
       for (const [nearD, farD] of dividerSpans) {
         if (farD <= nearD) continue;
         const [x1, y1] = pointAt(nearD);
@@ -631,7 +625,7 @@ export function JunctionPixiCanvas({
     if (labelLayer) {
       const labelDistance = Math.max(
         armReach + roadWidth * 0.5,
-        Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) * 0.13,
+        Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) * 0.035,
       );
       const labelLateralOffset = roadWidth + laneWidth;
       const anchors = directionLabelAnchors(
@@ -675,8 +669,8 @@ export function JunctionPixiCanvas({
     if (!app) return;
     const geo = geometryRef.current;
     const { bounds } = geo;
-    const laneWidth = laneWidthFor(bounds);
-    const { armReach } = pavementGeometryFor(bounds);
+    const laneWidth = laneWidthFor(geo);
+    const { armReach } = pavementGeometryFor(geo);
     const center = junctionCenter(geo);
     const positions = signalPositions(geo);
     // One short tick per simulated lane, laid crosswise over just that
@@ -739,8 +733,8 @@ export function JunctionPixiCanvas({
     if (!layer) return;
     const geo = geometryRef.current;
     const { bounds } = geo;
-    const { roadWidth, armReach } = pavementGeometryFor(bounds);
-    const laneWidth = laneWidthFor(bounds);
+    const { roadWidth, armReach } = pavementGeometryFor(geo);
+    const laneWidth = laneWidthFor(geo);
     const center = junctionCenter(geo);
 
     // Keep the congestion tint behind the signal and direction arrow.
@@ -827,19 +821,22 @@ export function JunctionPixiCanvas({
 
     for (const vehicle of vehicles) {
       seen.add(vehicle.vehicleId);
-      const laneWidth = laneWidthFor(geo.bounds);
+      const laneWidth = laneWidthFor(geo);
       const tick = signalTickGeometryFor(laneWidth);
       const stopDistance =
-        pavementGeometryFor(geo.bounds).armReach + tick.gap + tick.thickness;
+        pavementGeometryFor(geo).armReach + tick.gap + tick.thickness;
       const pose = vehicleDisplayPose(geo, vehicle, laneWidth, stopDistance);
       const { x: sx, y: sy } = pose;
       let sprite = vehiclesRef.current.get(vehicle.vehicleId);
       const size = 1;
+      const shapePoints = VEHICLE_SHAPE[vehicle.vehicleType](size);
       const halfShapeLength = Math.max(
-        ...VEHICLE_SHAPE[vehicle.vehicleType](size).map((point) =>
-          Math.abs(point[1]),
-        ),
+        ...shapePoints.map((point) => Math.abs(point[1])),
       );
+      const shapeWidth =
+        Math.max(...shapePoints.map((point) => point[0])) -
+        Math.min(...shapePoints.map((point) => point[0]));
+      const displayWidthScale = pose.width / shapeWidth;
 
       if (!sprite) {
         const isEmergency = vehicle.vehicleType === "emergency";
@@ -851,6 +848,7 @@ export function JunctionPixiCanvas({
           .fill(VEHICLE_COLOR[vehicle.vehicleType])
           .stroke({
             width: size * 0.1,
+            alignment: 1,
             color: VEHICLE_OUTLINE,
             alpha: 0.7,
           });
@@ -879,9 +877,7 @@ export function JunctionPixiCanvas({
         container.y = sy;
         container.rotation = (pose.rotation * Math.PI) / 180;
         container.scale.set(
-          vehicle.vehicleType === "motorcycle"
-            ? laneWidth * 0.38
-            : laneWidth * 0.28,
+          displayWidthScale,
           pose.length / (2 * halfShapeLength),
         );
         layer.addChild(container);
@@ -901,10 +897,7 @@ export function JunctionPixiCanvas({
           toRotation: pose.rotation,
           fromLength: pose.length,
           toLength: pose.length,
-          width:
-            vehicle.vehicleType === "motorcycle"
-              ? laneWidth * 0.38
-              : laneWidth * 0.28,
+          width: displayWidthScale,
           halfShapeLength,
           exitAtEdge: false,
           startedAt: now,

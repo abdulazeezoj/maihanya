@@ -115,6 +115,7 @@ class VehiclePosition(CamelModel):
     angle_deg: float = Field(ge=0, le=360)
     vehicle_type: VehicleType
     length_meters: float | None = Field(default=None, gt=0)
+    width_meters: float | None = Field(default=None, gt=0)
 
 
 class TrafficState(CamelModel):

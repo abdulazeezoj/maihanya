@@ -41,6 +41,7 @@ export interface VehiclePosition {
   angleDeg: number;
   vehicleType: VehicleType;
   lengthMeters?: number | null;
+  widthMeters?: number | null;
 }
 
 export interface TrafficState {
@@ -61,6 +62,7 @@ export interface LaneGeometry {
   direction: ApproachDirection;
   kind: LaneKind;
   shape: [number, number][];
+  widthMeters?: number;
 }
 
 export interface NetworkBounds {

@@ -57,6 +57,15 @@ export const VEHICLE_LENGTH: Record<VehicleType, number> = {
   emergency: 6,
 };
 
+// SUMO vType defaults, used only with older snapshots without widthMeters.
+export const VEHICLE_WIDTH: Record<VehicleType, number> = {
+  car: 1.8,
+  motorcycle: 0.8,
+  bus: 2.5,
+  truck: 2.5,
+  emergency: 1.8,
+};
+
 /** Shortest signed change in heading, including wraparound at north. */
 export function shortestAngleDelta(from: number, to: number): number {
   return ((((to - from + 180) % 360) + 360) % 360) - 180;
@@ -230,10 +239,7 @@ function vehicleLengthScale(
   return Math.min(...scales);
 }
 
-/** Map the front bumper while keeping the displayed vehicle length constant.
- * A small visual allowance helps short vehicles remain visible. Its size is
- * below the scenarios' default SUMO minimum gap (2.5 m).
- */
+/** Map the front bumper using the same scale for vehicle length and width. */
 export function vehicleDisplayPose(
   geometry: NetworkGeometry,
   vehicle: {
@@ -242,6 +248,7 @@ export function vehicleDisplayPose(
     angleDeg: number;
     vehicleType: VehicleType;
     lengthMeters?: number | null;
+    widthMeters?: number | null;
   },
   laneWidth: number,
   stopDistance: number,
@@ -270,12 +277,17 @@ export function vehicleDisplayPose(
     ),
   );
   const rotation = Math.atan2(front[0] - rear[0], rear[1] - front[1]);
-  const displayLength =
-    (length + 0.75) * vehicleLengthScale(geometry, laneWidth, stopDistance);
+  const scale = vehicleLengthScale(geometry, laneWidth, stopDistance);
+  const displayLength = length * scale;
+  const displayWidth = Math.min(
+    (vehicle.widthMeters ?? VEHICLE_WIDTH[vehicle.vehicleType]) * scale,
+    laneWidth * 0.95,
+  );
   return {
     x: front[0] - (Math.sin(rotation) * displayLength) / 2,
     y: front[1] + (Math.cos(rotation) * displayLength) / 2,
     length: displayLength,
+    width: displayWidth,
     rotation: (rotation * 180) / Math.PI,
   };
 }

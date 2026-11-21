@@ -23,6 +23,7 @@ class LaneGeometry(CamelModel):
     direction: ApproachDirection
     kind: LaneKind
     shape: list[tuple[float, float]]
+    width_meters: float = 3.2
 
 
 class NetworkBounds(CamelModel):
