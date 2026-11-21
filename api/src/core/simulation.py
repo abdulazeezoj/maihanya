@@ -16,10 +16,17 @@ from collections import deque
 from pathlib import Path
 
 from mahanya.config import Config
+from mahanya.data.run_store import RunStore, provenance
 from mahanya.model.infer import ModelRecommender
 from mahanya.scenarios import ScenarioDef
 from mahanya.scheduler import Controller
-from mahanya.schemas import Scenario, ScenarioStatus, SchedulerDecision, TrafficState
+from mahanya.schemas import (
+    DecisionLogRecord,
+    Scenario,
+    ScenarioStatus,
+    SchedulerDecision,
+    TrafficState,
+)
 from mahanya.sumo.traci_client import TraciClient
 
 logger = logging.getLogger(__name__)
@@ -51,6 +58,8 @@ class ScenarioSession:
         self._client: TraciClient | None = None
         self._controller: Controller | None = None
         self._tick = 0
+        self._store: RunStore | None = None
+        self._run_id: str | None = None
 
     @property
     def refresh_interval_sec(self) -> float:
@@ -94,14 +103,29 @@ class ScenarioSession:
                 sumo_binary=self._config.simulation.sumo_binary,
                 label=f"session-{self._def.id}-{id(self)}",
             )
-            self._client.start()
-            self._controller = Controller(
-                self._config.scheduler,
-                dt=self._config.simulation.control_interval_sec,
-                model=self._model,
-                sequence_length=self._config.model.sequence_length,
-                decision_log_path=self._decision_log_path,
-            )
+            try:
+                self._client.start()
+                self._store = RunStore(self._config.dashboard.run_store_path)
+                self._run_id = self._store.start(
+                    self._def.id,
+                    self._def.seed,
+                    provenance(self._config, sumocfg, self._model is not None),
+                )
+                self._controller = Controller(
+                    self._config.scheduler,
+                    dt=self._config.simulation.control_interval_sec,
+                    model=self._model,
+                    sequence_length=self._config.model.sequence_length,
+                    decision_log_path=self._decision_log_path,
+                )
+            except Exception:
+                self._client.close()
+                if self._store is not None and self._run_id is not None:
+                    self._store.finish(self._run_id, "failed")
+                self._store = None
+                self._run_id = None
+                self._status = "idle"
+                raise
             self._tick = 0
             self._thread = threading.Thread(target=self._run_loop, daemon=True)
             self._thread.start()
@@ -120,8 +144,16 @@ class ScenarioSession:
                 return
             if not self._client.time_remaining():
                 self._status = "completed"
+                self._stop.set()
+                self._paused.clear()
                 return
-            self._advance_one_tick()
+            try:
+                self._advance_one_tick()
+            except Exception:
+                self._status = "idle"
+                self._stop.set()
+                self._paused.clear()
+                raise
 
     def reset(self) -> None:
         with self._lock:
@@ -138,6 +170,10 @@ class ScenarioSession:
             self._latest_state = None
             self._latest_decision = None
             self._decision_log.clear()
+            if self._store is not None and self._run_id is not None:
+                self._store.finish(self._run_id, "stopped")
+            self._store = None
+            self._run_id = None
             self._status = "idle"
             self._tick = 0
             self._thread = None
@@ -149,6 +185,8 @@ class ScenarioSession:
         decision = self._controller.step(traffic)
         self._client.apply(decision.applied_phase)
         self._client.advance()
+        if self._store is not None and self._run_id is not None:
+            self._store.append(self._run_id, DecisionLogRecord(state=traffic, decision=decision))
         self._tick += 1
         self._latest_state = traffic
         self._latest_decision = decision
@@ -174,3 +212,7 @@ class ScenarioSession:
             with self._lock:
                 if self._client is not None and self._status in ("completed", "idle"):
                     self._client.close()
+                    if self._store is not None and self._run_id is not None:
+                        self._store.finish(
+                            self._run_id, "completed" if self._status == "completed" else "failed"
+                        )

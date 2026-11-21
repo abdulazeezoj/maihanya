@@ -307,7 +307,11 @@ pre-emption short-circuit), the resulting `SchedulerDecision` with its reason
 code, and a timestamp. This is a per-line evolution of the retired prototype's
 pattern of dumping one big JSON blob of `state_history` at the end of a run;
 per-line records are what let the dashboard poll incrementally instead of
-waiting for a run to finish.
+waiting for a run to finish. Dashboard and CLI scenario runs also persist each
+successfully advanced tick in a run-scoped SQLite store, with scenario, seed and
+input hashes. The legacy JSONL is not imported; the dashboard decision list
+remains an in-memory bounded view. See [Run recordings](RUN_RECORDING.md) for
+live queries, export and training limitations.
 
 <a id="dashboard"></a>
 <a id="api-and-dashboard"></a>

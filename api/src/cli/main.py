@@ -19,12 +19,14 @@ from rich.console import Console
 from mahanya.config import get_config
 from mahanya.data.distribution_fit import fit_all, load_fit_results, save_fit_results
 from mahanya.data.ingest import load_raw_counts
+from mahanya.data.run_store import RunStore, provenance
 from mahanya.data.sequence_gen import generate_sequences
 from mahanya.evaluation import FixedTimeController, MetricsCollector, run_scenario
 from mahanya.model.infer import ModelRecommender
 from mahanya.model.train import train as train_model
 from mahanya.scenarios import get_scenario_def
 from mahanya.scheduler import Controller
+from mahanya.schemas import DecisionLogRecord
 from mahanya.sumo.calibrate import generate_routes, write_sumocfg
 from mahanya.sumo.traci_client import TraciClient
 
@@ -149,20 +151,67 @@ def run(
         sumo_binary=cfg.simulation.sumo_binary,
         gui=gui,
     )
+    store = RunStore(cfg.dashboard.run_store_path)
     client.start()
-    controller = Controller(
-        cfg.scheduler,
-        dt=cfg.simulation.control_interval_sec,
-        model=model,
-        sequence_length=cfg.model.sequence_length,
-        decision_log_path=cfg.dashboard.decision_log_path,
-    )
+    run_id: str | None = None
+    decisions = []
     try:
-        decisions = controller.run(client, scenario_id, num_ticks)
+        run_id = store.start(
+            scenario_id,
+            seed if seed is not None else scenario_def.seed,
+            provenance(cfg, sumocfg, model is not None),
+        )
+        controller = Controller(
+            cfg.scheduler,
+            dt=cfg.simulation.control_interval_sec,
+            model=model,
+            sequence_length=cfg.model.sequence_length,
+            decision_log_path=cfg.dashboard.decision_log_path,
+        )
+        for tick in range(num_ticks):
+            traffic = client.observe(scenario_id, tick)
+            decision = controller.step(traffic)
+            client.apply(decision.applied_phase)
+            client.advance()
+            store.append(run_id, DecisionLogRecord(state=traffic, decision=decision))
+            decisions.append(decision)
+    except BaseException:
+        if run_id is not None:
+            store.finish(run_id, "failed")
+        raise
+    else:
+        store.finish(run_id, "completed")
     finally:
         client.close()
 
+    console.print(f"Recorded run {run_id} in {store.path}")
     console.print(dict(Counter(d.reason_code for d in decisions)))
+
+
+@app.command("export-run")
+def export_run(
+    run_id: str,
+    output: Path = typer.Option(..., help="New JSONL file for recorded ticks"),
+) -> None:
+    """Export observed ticks and a metadata sidecar for later review."""
+    store = RunStore(get_config().dashboard.run_store_path)
+    run_metadata = store.get_run(run_id)
+    if run_metadata is None:
+        raise typer.BadParameter("run not found", param_hint="run_id")
+    metadata_path = output.with_name(output.name + ".metadata.json")
+    if output.exists() or metadata_path.exists():
+        raise typer.BadParameter("output or metadata sidecar already exists", param_hint="--output")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    count = 0
+    cursor = -1
+    with output.open("x", encoding="utf-8") as file:
+        while rows := store.ticks(run_id, after_tick=cursor, limit=500):
+            for record in rows:
+                file.write(json.dumps(record, ensure_ascii=False) + "\n")
+                cursor = record["state"]["tick"]
+                count += 1
+    metadata_path.write_text(json.dumps(run_metadata, indent=2), encoding="utf-8")
+    console.print(f"Exported {count} ticks to {output}; metadata: {metadata_path}")
 
 
 @app.command()

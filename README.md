@@ -111,6 +111,10 @@ pnpm test && pnpm test:e2e                             # vitest + Playwright
 A synthetic placeholder field-count CSV
 (`api/data/raw/sapon_traffic_counts.csv`) stands in for a real Sapon
 Under-bridge Junction survey; swapping it in is a drop-in file replacement.
+Straight and turning routes use assumed 60% / 20% / 20% shares, not measured
+turning movements. Dashboard and CLI runs record per-tick state and decisions
+in local SQLite; see [Run recordings](docs/RUN_RECORDING.md) for live queries,
+export and the distinction between observations and validated training labels.
 
 ## Prior art
 

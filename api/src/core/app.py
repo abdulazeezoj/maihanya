@@ -10,7 +10,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routes import controls, scenarios, snapshots, streams
+from routes import controls, runs, scenarios, snapshots, streams
 
 
 def create_app() -> FastAPI:
@@ -32,6 +32,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(scenarios.router, prefix="/api")
+    app.include_router(runs.router, prefix="/api")
     app.include_router(controls.router, prefix="/api")
     app.include_router(snapshots.router, prefix="/api")
     app.include_router(streams.router, prefix="/api")

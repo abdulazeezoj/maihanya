@@ -68,6 +68,7 @@ class DashboardConfig(BaseSettings):
 
     refresh_interval_sec: float = 1.0
     decision_log_path: Path = API_DIR / "data" / "processed" / "decision_log.jsonl"
+    run_store_path: Path = API_DIR / "data" / "processed" / "runs.sqlite3"
     max_history: int = 500
 
 

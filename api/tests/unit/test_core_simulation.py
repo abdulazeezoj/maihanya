@@ -60,11 +60,16 @@ def fake_traci(monkeypatch):
 
 
 @pytest.fixture
-def session() -> ScenarioSession:
+def session(tmp_path) -> ScenarioSession:
     config = get_config()
     # Fast polling so tests don't need long sleeps.
     config = config.model_copy(
-        update={"simulation": config.simulation.model_copy(update={"control_interval_sec": 0.01})}
+        update={
+            "simulation": config.simulation.model_copy(update={"control_interval_sec": 0.01}),
+            "dashboard": config.dashboard.model_copy(
+                update={"run_store_path": tmp_path / "runs.sqlite3"}
+            ),
+        }
     )
     return ScenarioSession(
         config, SCENARIO_CATALOG["sapon-peak"], model=None, decision_log_path=None
@@ -138,4 +143,48 @@ def test_reset_clears_state_and_closes_client(session):
 def test_decision_log_bounded_by_max_history(session):
     session.start()
     assert _wait_until(lambda: len(session.decision_log(10_000)) >= 5)
+    session.reset()
+
+
+def test_recording_survives_reset_and_distinguishes_runs(session):
+    from mahanya.data.run_store import RunStore
+
+    session.start()
+    assert _wait_until(lambda: session.latest_state() is not None)
+    session.pause()
+    session.step()
+    session.reset()
+    store = RunStore(session._config.dashboard.run_store_path)
+    runs = store.list_runs()
+    assert len(runs) == 1
+    assert runs[0]["status"] == "stopped"
+    assert len(store.ticks(runs[0]["id"])) >= 2
+    session.start()
+    assert _wait_until(lambda: session.latest_state() is not None)
+    session.reset()
+    assert len(store.list_runs()) == 2
+
+
+def test_start_failure_leaves_session_idle(session, monkeypatch):
+    def fail_start(_client):
+        raise OSError("SUMO did not start")
+
+    monkeypatch.setattr(FakeTraciClient, "start", fail_start)
+    with pytest.raises(OSError):
+        session.start()
+    assert session.scenario.status == "idle"
+
+
+def test_recording_failure_stops_session_and_marks_run_failed(session, monkeypatch):
+    from mahanya.data.run_store import RunStore
+
+    def fail_append(_store, _run_id, _record):
+        raise OSError("cannot write tick")
+
+    monkeypatch.setattr(RunStore, "append", fail_append)
+    session.start()
+    store = RunStore(session._config.dashboard.run_store_path)
+    assert _wait_until(lambda: store.list_runs()[0]["status"] == "failed")
+    assert session.scenario.status == "idle"
+    assert store.ticks(store.list_runs()[0]["id"]) == []
     session.reset()

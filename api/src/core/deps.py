@@ -12,6 +12,7 @@ from functools import lru_cache
 
 from core.simulation import ScenarioSession
 from mahanya.config import Config, get_config
+from mahanya.data.run_store import RunStore
 from mahanya.model.infer import ModelRecommender
 from mahanya.scenarios import get_scenario_def
 from mahanya.schemas import ScenarioStatus
@@ -22,6 +23,11 @@ logger = logging.getLogger(__name__)
 @lru_cache
 def get_settings() -> Config:
     return get_config()
+
+
+@lru_cache
+def get_run_store() -> RunStore:
+    return RunStore(get_settings().dashboard.run_store_path)
 
 
 @lru_cache

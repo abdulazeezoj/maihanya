@@ -118,7 +118,8 @@ it, and every such decision is logged with a reason code (e.g.
 | Calibrated scenario (`.net.xml`/`.rou.xml`/`.sumocfg`) | SUMO calibration (+ `netedit`) | Sequence generation, runtime control loop, evaluation |
 | Labelled sequences (Parquet) | Sequence generation | Model training |
 | Trained model weights | Model training | Runtime control loop |
-| Runtime decision log (JSON-lines) | Runtime control loop | Evaluation, internal FastAPI relay, dashboard |
+| Runtime decision log (JSON-lines) | Runtime control loop | Offline inspection; dashboard retains a bounded in-memory decision view |
+| Run-scoped tick archive (SQLite) | Dashboard or CLI scenario run | Live run/tick queries and JSONL export for later review and data preparation |
 | Evaluation report | Evaluation | internal FastAPI relay, dashboard |
 
 ## Failure and fallback behavior
