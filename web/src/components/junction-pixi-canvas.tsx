@@ -1276,9 +1276,6 @@ export function JunctionPixiCanvas({
               data-testid="junction-directions"
             >
               <span>N ↑</span>
-              <span>E →</span>
-              <span>S ↓</span>
-              <span>W ←</span>
             </Badge>
           </div>
 

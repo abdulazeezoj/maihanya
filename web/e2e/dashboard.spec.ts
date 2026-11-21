@@ -180,7 +180,7 @@ test("direction guide stays fixed while the map zooms and pans", async ({
   const canvas = page
     .getByRole("img", { name: /live junction simulation/i })
     .locator("canvas");
-  await expect(guide).toHaveText(/N ↑.*E →.*S ↓.*W ←/);
+  await expect(guide).toHaveText(/^N ↑$/);
   const relativePosition = () =>
     guide.evaluate((element) => {
       const guideBox = element.getBoundingClientRect();
