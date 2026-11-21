@@ -162,6 +162,56 @@ test("live junction view renders a Pixi canvas once a scenario's geometry loads"
   await expect(junction.locator("canvas")).toBeVisible();
 });
 
+test("direction guide stays fixed while the map zooms and pans", async ({
+  page,
+}) => {
+  await page.route("**/api/scenarios/*/network", (route) =>
+    route.fulfill({ json: NETWORK_GEOMETRY }),
+  );
+  await page.route("**/api/scenarios", (route) =>
+    route.fulfill({ json: SCENARIOS }),
+  );
+  await page.goto("/");
+  await page.getByRole("combobox", { name: /select scenario/i }).click();
+  await page
+    .getByRole("option", { name: /Sapon Under-bridge: Peak Hour/i })
+    .click();
+  const guide = page.getByTestId("junction-directions");
+  const canvas = page
+    .getByRole("img", { name: /live junction simulation/i })
+    .locator("canvas");
+  await expect(guide).toHaveText(/N ↑.*E →.*S ↓.*W ←/);
+  const relativePosition = () =>
+    guide.evaluate((element) => {
+      const guideBox = element.getBoundingClientRect();
+      const hostBox = element.closest('[role="img"]')?.getBoundingClientRect();
+      if (!hostBox) throw new Error("Missing junction host");
+      return { x: guideBox.x - hostBox.x, y: guideBox.y - hostBox.y };
+    });
+  const before = await relativePosition();
+  await page.locator('button[aria-label="Zoom out"]').click();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("Missing canvas");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    box.x + box.width / 2 + 35,
+    box.y + box.height / 2 + 20,
+  );
+  await page.mouse.up();
+  const after = await relativePosition();
+  expect(after.x).toBeCloseTo(before.x, 1);
+  expect(after.y).toBeCloseTo(before.y, 1);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const guideBox = await guide.boundingBox();
+  const controlBox = await page
+    .locator('button[aria-label="Zoom out"]')
+    .boundingBox();
+  if (!guideBox || !controlBox)
+    throw new Error("Missing guide or zoom control");
+  expect(guideBox.y + guideBox.height).toBeLessThanOrEqual(controlBox.y);
+});
+
 test("road arms remain paved where they meet the junction at multiple zoom levels", async ({
   page,
 }) => {

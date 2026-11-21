@@ -99,6 +99,8 @@ export function JunctionSimulationView({
                 {trafficState
                   ? `${trafficState.vehicles.length} vehicles on the junction, active phase ${trafficState.activePhase}${emergencySummary(trafficState)}`
                   : "Junction idle, no live traffic state"}
+                . Map orientation: north is up, east is right, south is down,
+                and west is left.
               </span>
             </div>
             <VehicleLegend />

@@ -5,16 +5,14 @@ import {
   MagnifyingGlassMinusIcon,
   MagnifyingGlassPlusIcon,
 } from "@phosphor-icons/react";
-import { Application, Container, Graphics, Text } from "pixi.js";
+import { Application, Container, Graphics } from "pixi.js";
 import * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   congestionColor,
   congestionLevel,
-  DIRECTION_LABEL,
   DIRECTIONS,
-  directionLabelAnchors,
   junctionCenter,
   junctionPavementOutline,
   offsetRibbon,
@@ -28,12 +26,7 @@ import {
   vehicleDisplayPose,
   vehicleExitTarget,
 } from "@/lib/junction-scene";
-import type {
-  ApproachDirection,
-  NetworkGeometry,
-  TrafficState,
-  VehicleType,
-} from "@/lib/types";
+import type { NetworkGeometry, TrafficState, VehicleType } from "@/lib/types";
 
 // This canvas is a faithful, always-the-same-look replica of SUMO-GUI's own
 // top-down rendering: green grass, dark asphalt, white lane paint, a short
@@ -53,8 +46,6 @@ const SIGNAL_COLOR: Record<"red" | "yellow" | "green", number> = {
 };
 const VEHICLE_OUTLINE = 0x3a2b00;
 const EMERGENCY_BEACON = [0xef4444, 0x3b82f6];
-const LABEL_FILL = 0xffffff;
-const LABEL_STROKE = 0x1a1a1a;
 
 const TWEEN_MS = 1000;
 const EMERGENCY_BEACON_PERIOD_MS = 600;
@@ -395,10 +386,6 @@ export function JunctionPixiCanvas({
   const congestionLayerRef = React.useRef<Graphics | null>(null);
   const signalLayerRef = React.useRef<Container | null>(null);
   const vehicleLayerRef = React.useRef<Container | null>(null);
-  const labelLayerRef = React.useRef<Container | null>(null);
-  const labelTextsRef = React.useRef<Partial<Record<ApproachDirection, Text>>>(
-    {},
-  );
   const signalGraphicsRef = React.useRef<Partial<Record<string, Graphics>>>({});
   const vehiclesRef = React.useRef<Map<string, VehicleSprite>>(new Map());
   const geometryRef = React.useRef(geometry);
@@ -616,52 +603,6 @@ export function JunctionPixiCanvas({
           .quadraticCurveTo(x, y, x, y + ySign * rounding)
           .closePath()
           .fill(ASPHALT);
-      }
-    }
-
-    // Direction captions ("North"/"South"/...) set back along each arm and
-    // offset into the grass beside the road, so a viewer can read
-    // orientation without the text sitting on top of the lane markings.
-    // World-space (pan/zoom with the plaza); a matching counter-scale is
-    // applied per frame so the glyphs stay a constant, legible screen size.
-    const labelLayer = labelLayerRef.current;
-    if (labelLayer) {
-      const labelDistance = Math.max(
-        armReach + roadWidth * 0.5,
-        Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) * 0.035,
-      );
-      const labelLateralOffset = roadWidth + laneWidth;
-      const anchors = directionLabelAnchors(
-        geo,
-        labelDistance,
-        labelLateralOffset,
-      );
-      for (const direction of DIRECTIONS) {
-        let text = labelTextsRef.current[direction];
-        if (!text) {
-          text = new Text({
-            text: DIRECTION_LABEL[direction],
-            style: {
-              fontFamily: "ui-monospace, monospace",
-              fontSize: 13,
-              fontWeight: "700",
-              letterSpacing: 1,
-              fill: LABEL_FILL,
-              stroke: { color: LABEL_STROKE, width: 3 },
-            },
-          });
-          text.anchor.set(0.5);
-          labelLayer.addChild(text);
-          labelTextsRef.current[direction] = text;
-        }
-        const anchor = anchors[direction];
-        if (anchor) {
-          const [sx, sy] = toSceneSpace(bounds, [anchor.x, anchor.y]);
-          text.position.set(sx, sy);
-          text.visible = true;
-        } else {
-          text.visible = false;
-        }
       }
     }
   }, []);
@@ -979,8 +920,7 @@ export function JunctionPixiCanvas({
         // World layer: everything that pans/zooms together with the fit
         // transform, stacked bottom to top: roads/pavement, the live
         // congestion tint over them, signal bars on top of the tint (so it
-        // never muddies their color), vehicles above the road surface, and
-        // direction captions on top of all of it.
+        // never muddies their color), and vehicles above the road surface.
         const scene = new Graphics();
         const congestionLayer = new Graphics();
         const signalLayer = new Container();
@@ -995,22 +935,14 @@ export function JunctionPixiCanvas({
           .fill(0xffffff);
         vehicleLayer.addChild(vehicleMask);
         vehicleLayer.mask = vehicleMask;
-        const labelLayer = new Container();
         const world = new Container();
-        world.addChild(
-          scene,
-          congestionLayer,
-          signalLayer,
-          vehicleLayer,
-          labelLayer,
-        );
+        world.addChild(scene, congestionLayer, signalLayer, vehicleLayer);
         app.stage.addChild(world);
 
         sceneRef.current = scene;
         congestionLayerRef.current = congestionLayer;
         signalLayerRef.current = signalLayer;
         vehicleLayerRef.current = vehicleLayer;
-        labelLayerRef.current = labelLayer;
 
         app.renderer.background.color = GRASS;
         drawStatic();
@@ -1218,14 +1150,6 @@ export function JunctionPixiCanvas({
           world.scale.set(scale);
           world.position.set(posX, posY);
 
-          // Direction captions live in world space (so they pan with the
-          // plaza) but counter-scale against the world zoom so they stay a
-          // constant, legible screen size.
-          const inverseScale = scale > 0 ? 1 / scale : 1;
-          for (const text of Object.values(labelTextsRef.current)) {
-            text?.scale.set(inverseScale);
-          }
-
           const now = performance.now();
           for (const [id, sprite] of vehiclesRef.current) {
             const t = Math.min((now - sprite.startedAt) / TWEEN_MS, 1);
@@ -1293,8 +1217,6 @@ export function JunctionPixiCanvas({
       congestionLayerRef.current = null;
       signalLayerRef.current = null;
       vehicleLayerRef.current = null;
-      labelLayerRef.current = null;
-      labelTextsRef.current = {};
       signalGraphicsRef.current = {};
       vehiclesRef.current.clear();
     };
@@ -1336,15 +1258,27 @@ export function JunctionPixiCanvas({
         className="pointer-events-none absolute inset-0 flex flex-col justify-between gap-2 p-2.5"
       >
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Badge variant="secondary" className="font-mono tabular-nums">
-              Tick {trafficState?.tick ?? "-"}
-            </Badge>
-            <Badge variant="outline" className="font-mono tabular-nums">
-              {trafficState?.activePhase ?? "IDLE"} ·{" "}
-              {trafficState
-                ? `${Math.round(trafficState.elapsedPhaseTimeSec)}s`
-                : "-"}
+          <div className="flex flex-col items-start gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge variant="secondary" className="font-mono tabular-nums">
+                Tick {trafficState?.tick ?? "-"}
+              </Badge>
+              <Badge variant="outline" className="font-mono tabular-nums">
+                {trafficState?.activePhase ?? "IDLE"} ·{" "}
+                {trafficState
+                  ? `${Math.round(trafficState.elapsedPhaseTimeSec)}s`
+                  : "-"}
+              </Badge>
+            </div>
+            <Badge
+              variant="secondary"
+              className="gap-2 font-mono"
+              data-testid="junction-directions"
+            >
+              <span>N ↑</span>
+              <span>E →</span>
+              <span>S ↓</span>
+              <span>W ←</span>
             </Badge>
           </div>
 
