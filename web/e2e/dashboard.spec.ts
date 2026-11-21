@@ -201,11 +201,15 @@ test("road arms remain paved where they meet the junction at multiple zoom level
                 (Math.min(image.width, image.height) / 300) * 0.9 * zoomLevel;
               const cx = image.width / 2;
               const cy = image.height / 2;
-              return [
+              const paved = [
                 [1.6, -5],
                 [1.6, 5],
                 [-5, 1.6],
                 [5, 1.6],
+                [-3.6, -3.6],
+                [-3.6, 3.6],
+                [3.6, -3.6],
+                [3.6, 3.6],
               ].every(([x, y]) => {
                 const [r, g, b] = ctx.getImageData(
                   Math.round(cx + x * scale),
@@ -215,6 +219,21 @@ test("road arms remain paved where they meet the junction at multiple zoom level
                 ).data;
                 return r < 70 && g < 70 && b < 70;
               });
+              const outside = [
+                [-6.5, -6.5],
+                [-6.5, 6.5],
+                [6.5, -6.5],
+                [6.5, 6.5],
+              ].every(([x, y]) => {
+                const [r, g, b] = ctx.getImageData(
+                  Math.round(cx + x * scale),
+                  Math.round(cy + y * scale),
+                  1,
+                  1,
+                ).data;
+                return g > r && g > b && g > 70;
+              });
+              return paved && outside;
             },
             { data: png.toString("base64"), zoomLevel: zoom },
           );

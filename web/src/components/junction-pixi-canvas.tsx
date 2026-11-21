@@ -601,6 +601,24 @@ export function JunctionPixiCanvas({
       }
     }
 
+    // Fill the four concave corners after drawing the road ribbons.
+    // The curves join their outside edges without changing lane geometry.
+    const [centerX, centerY] = toSceneSpace(bounds, [center.x, center.y]);
+    const cornerReach = roadWidth;
+    const rounding = roadWidth * 0.85;
+    for (const xSign of [-1, 1]) {
+      for (const ySign of [-1, 1]) {
+        const x = centerX + xSign * cornerReach;
+        const y = centerY + ySign * cornerReach;
+        scene
+          .moveTo(x, y)
+          .lineTo(x + xSign * rounding, y)
+          .quadraticCurveTo(x, y, x, y + ySign * rounding)
+          .closePath()
+          .fill(ASPHALT);
+      }
+    }
+
     // Direction captions ("North"/"South"/...) set back along each arm and
     // offset into the grass beside the road, so a viewer can read
     // orientation without the text sitting on top of the lane markings.
